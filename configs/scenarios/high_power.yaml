@@ -1,0 +1,22 @@
+# High-power (ITER-like) scenario
+grid:
+  n_rho: 100
+
+source:
+  S0: 4.0
+  rho_dep: 0.3
+  sigma: 0.1
+
+bc:
+  Te_ped: 1500.0
+
+solver:
+  dt: 1.0e-4
+  n_steps: 5000
+  theta: 0.5
+
+transport:
+  chi0: 1.0
+
+geometry: circular
+seed: 42
