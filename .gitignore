@@ -191,6 +191,12 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# Project-specific: runtime outputs (do not commit)
+outputs/
+
+# Project-specific: large generated datasets
+data/
+
 # PyPI configuration file
 .pypirc
 
@@ -205,3 +211,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Agent-only spec (do not upload)
+PROJECT_SPEC.md
+.vscode/
