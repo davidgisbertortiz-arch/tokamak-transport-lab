@@ -45,6 +45,15 @@ This produces `data/transport_train.npz` (10 k samples) and
 `data/transport_test.npz` (2 k samples) via Latin Hypercube sampling of the
 stiffness model.  Override sizes with `--size_train` / `--size_test`.
 
+Train the MLP transport surrogate:
+
+```bash
+pip install -e ".[surrogate]"   # adds torch
+python -m scripts.train_surrogate --train data/transport_train.npz --test data/transport_test.npz
+```
+
+Outputs to `outputs/surrogate/`: `model.pt`, `metrics.json`, `calibration.png`.
+
 Run the tests:
 
 ```bash
@@ -85,7 +94,7 @@ tokamak-transport-lab/
 | 1  | Scaffold + CI + smoke tests | ✅ |
 | 2  | CN solver + semi-analytic verification + plot | ✅ |
 | 3  | Stiffness model + dataset generator (LHS) | ✅ |
-| 4  | Surrogate baseline (torch MLP) + training | 🔜 |
+| 4  | Surrogate baseline (torch MLP) + training | ✅ |
 | 5  | Picard loop + safeguards + convergence | 🔜 |
 | 6+ | UQ, visuals, Streamlit | 🔜 |
 

@@ -23,6 +23,7 @@ def test_subpackage_imports() -> None:
         "tokamak_transport_lab.integration",
         "tokamak_transport_lab.evaluation",
         "tokamak_transport_lab.visualization",
+        "tokamak_transport_lab.utils",
     ]
     for pkg in subpackages:
         mod = importlib.import_module(pkg)
