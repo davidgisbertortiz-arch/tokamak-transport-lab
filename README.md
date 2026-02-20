@@ -35,6 +35,16 @@ python -m scripts.run_solver --config configs/solver.yaml
 This produces `outputs/solver_verification.npz` with the converged temperature
 profile, diffusivity, source, and residual history.
 
+Generate synthetic transport dataset:
+
+```bash
+python -m scripts.generate_dataset --config configs/dataset.yaml
+```
+
+This produces `data/transport_train.npz` (10 k samples) and
+`data/transport_test.npz` (2 k samples) via Latin Hypercube sampling of the
+stiffness model.  Override sizes with `--size_train` / `--size_test`.
+
 Run the tests:
 
 ```bash
@@ -73,8 +83,8 @@ tokamak-transport-lab/
 | PR | Milestone | Status |
 |----|-----------|--------|
 | 1  | Scaffold + CI + smoke tests | ✅ |
-| 2  | CN solver + semi-analytic verification + plot | 🔜 |
-| 3  | Stiffness model + dataset generator (LHS) | 🔜 |
+| 2  | CN solver + semi-analytic verification + plot | ✅ |
+| 3  | Stiffness model + dataset generator (LHS) | ✅ |
 | 4  | Surrogate baseline (torch MLP) + training | 🔜 |
 | 5  | Picard loop + safeguards + convergence | 🔜 |
 | 6+ | UQ, visuals, Streamlit | 🔜 |
