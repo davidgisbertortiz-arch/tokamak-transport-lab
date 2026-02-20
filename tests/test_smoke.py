@@ -15,6 +15,7 @@ def test_subpackage_imports() -> None:
 
     subpackages = [
         "tokamak_transport_lab.solver",
+        "tokamak_transport_lab.physics",
         "tokamak_transport_lab.transport",
         "tokamak_transport_lab.geometry",
         "tokamak_transport_lab.surrogate",
