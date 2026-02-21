@@ -100,6 +100,36 @@ python -m scripts.train_surrogate --train data/transport_train.npz --test data/t
 
 Outputs to `outputs/surrogate/`: `model.pt`, `metrics.json`, `calibration.png`.
 
+### Uncertainty (Ensemble + Conformal) & Geometry (Miller-lite)
+
+Train a Deep Ensemble (5 members by default, each with a different seed):
+
+```bash
+python -m scripts.train_ensemble --config configs/ensemble.yaml
+```
+
+Outputs to `outputs/ensemble/`: `member_0.pt` … `member_4.pt`,
+`norm_stats.npz`, `metadata.json`, `metrics.json`.
+
+Calibrate split conformal prediction intervals on a held-out set:
+
+```bash
+python -m scripts.calibrate_conformal --config configs/conformal.yaml
+```
+
+Outputs to `outputs/conformal/`: `conformal.json` ($\hat{q}$, $\alpha$, timestamp),
+`summary.json` (empirical coverage check).
+
+**Miller geometry** — the solver can use a shaped flux-surface volume element
+$V'(\rho) \approx \kappa(1 + \tfrac{1}{2}\delta^2)\rho$ instead of the
+circular $V'=\rho$.  Set `kappa` and `delta` in your config or call
+`vprime_miller()` directly.
+
+> **Limitations:** The ensemble captures epistemic uncertainty only (no
+> aleatoric head).  The conformal wrapper provides marginal (not conditional)
+> coverage guarantees.  The Miller model is a lowest-order analytic
+> approximation — not a full Grad–Shafranov solution.
+
 Run the tests:
 
 ```bash
@@ -141,8 +171,10 @@ tokamak-transport-lab/
 | 2  | CN solver + semi-analytic verification + plot | ✅ |
 | 3  | Stiffness model + dataset generator (LHS) | ✅ |
 | 4  | Surrogate baseline (torch MLP) + training | ✅ |
-| 5  | Picard loop + safeguards + convergence | 🔜 |
-| 6+ | UQ, visuals, Streamlit | 🔜 |
+| 5  | CI sanity + formatting + LaTeX physics README | ✅ |
+| 6  | Ensemble UQ + conformal + Miller geometry | ✅ |
+| 7  | Picard loop + safeguards + convergence | 🔜 |
+| 8+ | Visuals, Streamlit | 🔜 |
 
 ## License
 

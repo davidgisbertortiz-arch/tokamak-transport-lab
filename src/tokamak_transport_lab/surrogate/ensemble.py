@@ -2,6 +2,14 @@
 
 Wraps *N* independently trained ``torch.nn.Module`` members and provides
 aggregate predictions with mean and epistemic standard deviation.
+
+Limitations
+-----------
+- Epistemic uncertainty only (no aleatoric / heteroscedastic head).
+- Members must share the same architecture; only random init and
+  data-shuffling provide diversity.
+- Population std (``correction=0``) is used so a single-member
+  ensemble returns zero uncertainty instead of NaN.
 """
 
 from __future__ import annotations

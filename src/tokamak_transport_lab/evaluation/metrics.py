@@ -1,6 +1,13 @@
 """Regression and UQ metrics for surrogate evaluation.
 
 All functions accept plain numpy arrays.
+
+Limitations
+-----------
+- ``regression_ece_gaussian`` assumes a Gaussian predictive distribution;
+  for ensemble predictions the mean and std of the member outputs are
+  treated as the parameters of a single Gaussian.
+- ``coverage`` checks marginal (not conditional) coverage.
 """
 
 from __future__ import annotations
