@@ -54,6 +54,24 @@ python -m scripts.train_surrogate --train data/transport_train.npz --test data/t
 
 Outputs to `outputs/surrogate/`: `model.pt`, `metrics.json`, `calibration.png`.
 
+### Picard Iteration Loop
+
+Run a self-consistent Picard loop coupling the stiffness transport model
+with the CN solver:
+
+```bash
+python -m scripts.run_picard --config configs/scenarios/mid_power.yaml --run-id demo
+```
+
+Outputs to `outputs/picard/demo/`:
+- `result.npz` — rho, Te, chi, residual & alpha histories
+- `metrics.json` — convergence metadata + profile stats
+- `profiles.png` — Te(rho) and chi(rho) side-by-side
+- `convergence.png` — residual and relaxation-parameter history
+
+Three scenarios are provided: `low_power`, `mid_power`, `high_power`
+(the last uses Miller geometry).  Each runs end-to-end in under 60 s.
+
 Run the tests:
 
 ```bash
@@ -95,7 +113,7 @@ tokamak-transport-lab/
 | 2  | CN solver + semi-analytic verification + plot | ✅ |
 | 3  | Stiffness model + dataset generator (LHS) | ✅ |
 | 4  | Surrogate baseline (torch MLP) + training | ✅ |
-| 5  | Picard loop + safeguards + convergence | 🔜 |
+| 5  | Picard loop + safeguards + convergence + CLI | ✅ |
 | 6+ | UQ, visuals, Streamlit | 🔜 |
 
 ## License

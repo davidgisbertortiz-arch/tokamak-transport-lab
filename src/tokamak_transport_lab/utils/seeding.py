@@ -16,7 +16,7 @@ def seed_everything(seed: int = 42) -> None:
         Master seed value.
     """
     random.seed(seed)
-    np.random.seed(seed)  # noqa: NPY002
+    np.random.seed(seed)
 
     try:
         import torch

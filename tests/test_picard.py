@@ -240,3 +240,91 @@ class TestPicardLoop:
             sub_steps=50,
         )
         assert np.isfinite(result.te_final).all()
+
+    # ── Phase-07 finalisation tests ──────────────────────────────
+
+    def test_stable_case_converges(self) -> None:
+        """Well-behaved scenario converges in < 60 iters with converged=True."""
+        from tokamak_transport_lab.transport.stiffness import chi_total
+
+        result = run_picard(
+            n_rho=40,
+            t_ped=500.0,
+            s0=1.0,
+            rho_dep=0.3,
+            sigma=0.1,
+            transport_model=chi_total,
+            transport_params={
+                "chi_s": 1.0,
+                "a_over_LTe_crit": 3.0,
+                "alpha_s": 1.5,
+                "chi_neo": 0.5,
+            },
+            dt=1e-4,
+            sub_steps=300,
+            max_iters=60,
+            tol=1e-3,
+            alpha0=0.5,
+        )
+        assert result.metadata["converged"] is True
+        assert result.metadata["n_iters"] < 60
+
+    def test_fallback_on_adversarial_model(self) -> None:
+        """Adversarial model (returns extreme chi) triggers fallback."""
+        from tokamak_transport_lab.transport.stiffness import chi_total
+
+        def adversarial_model(
+            a_over_lte: np.ndarray, **_: object
+        ) -> np.ndarray:
+            # Alternating NaN / huge values → forces fallback
+            out = np.full_like(a_over_lte, np.nan)
+            return out
+
+        result = run_picard(
+            n_rho=20,
+            transport_model=adversarial_model,
+            fallback_model=chi_total,
+            fallback_params={"chi_neo": 0.5},
+            max_iters=8,
+            sub_steps=50,
+            divergence_patience=3,
+        )
+        assert result.metadata["used_fallback"] is True
+        assert np.isfinite(result.te_final).all()
+
+    def test_residual_generally_decreases(self) -> None:
+        """On a well-behaved case the residual should trend downward.
+
+        We allow up to 3 small 'bumps' — the overall trend must be
+        decreasing as measured by first-half-mean > second-half-mean.
+        """
+        from tokamak_transport_lab.transport.stiffness import chi_total
+
+        result = run_picard(
+            n_rho=40,
+            t_ped=500.0,
+            s0=1.0,
+            rho_dep=0.3,
+            sigma=0.1,
+            transport_model=chi_total,
+            transport_params={
+                "chi_s": 1.0,
+                "a_over_LTe_crit": 3.0,
+                "alpha_s": 1.5,
+                "chi_neo": 0.5,
+            },
+            dt=1e-4,
+            sub_steps=300,
+            max_iters=40,
+            tol=1e-4,
+            alpha0=0.5,
+        )
+        hist = result.residual_history
+        assert len(hist) >= 2, "Need at least 2 iterations"
+        mid = len(hist) // 2
+        first_half_mean = np.mean(hist[:mid])
+        second_half_mean = np.mean(hist[mid:])
+        assert second_half_mean < first_half_mean, (
+            f"Residual not decreasing: first_half={first_half_mean:.2e}, "
+            f"second_half={second_half_mean:.2e}"
+        )

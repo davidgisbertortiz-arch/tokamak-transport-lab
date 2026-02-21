@@ -118,7 +118,7 @@ def main() -> None:
         "n_test": int(X_test.shape[0]),
         "epochs": args.epochs,
     }
-    print(f"\nTest metrics:")
+    print("\nTest metrics:")
     for k, v in metrics.items():
         print(f"  {k:12s}: {v}")
 

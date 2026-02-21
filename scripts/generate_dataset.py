@@ -88,10 +88,14 @@ def main() -> None:
 
     # ── Summary ──────────────────────────────────────────────────
     print(f"\nDone. Feature names: {list(train_data['feature_names'])}")
-    print(f"  Train X shape: {train_data['X'].shape}, y range: "
-          f"[{train_data['y'].min():.2f}, {train_data['y'].max():.2f}]")
-    print(f"  Test  X shape: {test_data['X'].shape},  y range: "
-          f"[{test_data['y'].min():.2f}, {test_data['y'].max():.2f}]")
+    print(
+        f"  Train X shape: {train_data['X'].shape}, y range: "
+        f"[{train_data['y'].min():.2f}, {train_data['y'].max():.2f}]"
+    )
+    print(
+        f"  Test  X shape: {test_data['X'].shape},  y range: "
+        f"[{test_data['y'].min():.2f}, {test_data['y'].max():.2f}]"
+    )
 
 
 if __name__ == "__main__":
