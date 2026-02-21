@@ -61,7 +61,10 @@ select = [
     "RUF", # ruff-specific
 ]
 ignore = [
-    "E501", # line too long (handled by formatter)
+    "E501",  # line too long (handled by formatter)
+    "RUF001", # ambiguous Unicode in strings   -- intentional Greek notation
+    "RUF002", # ambiguous Unicode in docstrings -- intentional Greek notation
+    "RUF003", # ambiguous Unicode in comments   -- intentional Greek notation
 ]
 
 [tool.ruff.lint.isort]

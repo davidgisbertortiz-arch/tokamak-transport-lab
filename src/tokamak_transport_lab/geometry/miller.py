@@ -1,15 +1,14 @@
-"""Lowest-order Miller parameterization of flux-surface geometry.
+"""Miller-parameterised flux-surface geometry.
 
-Provides a V'(rho) function that captures the leading-order effects of
-elongation (kappa) and triangularity (delta) on the flux-surface volume
-element.  At kappa=1, delta=0 this recovers the circular limit V'=rho.
+Provides an effective volume-element derivative V'(rho) that depends on
+elongation kappa and triangularity delta.  In the limit
+kappa = 1, delta = 0 the result recovers the circular expression
+V'(rho) = rho.
 
-Limitations
------------
-- This is a *lowest-order* approximation.  Higher-order Shafranov-shift,
-  squareness, and up-down asymmetry corrections are neglected.
-- The formula assumes concentric flux surfaces with no radial dependence
-  of the shaping parameters (i.e. kappa and delta are constant in rho).
+This is a *minimal* Miller model sufficient to exercise the pipeline.
+The full Miller parameterisation involves solving a Grad-Shafranov-like
+system for the metric coefficients; here we use the lowest-order analytic
+approximation.
 """
 
 from __future__ import annotations
@@ -28,24 +27,31 @@ def vprime_miller(
     kappa: float = 1.0,
     delta: float = 0.0,
 ) -> NDArray[np.float64]:
-    r"""Return the volume-element derivative V'(rho) with Miller shaping.
+    r"""Effective volume-element derivative for shaped flux surfaces.
+
+    Uses the lowest-order approximation:
 
     .. math::
+        V'(\rho) \approx \kappa\,(1 + 0.5\,\delta^2)\;\rho
 
-        V'(\rho) = \rho \, \kappa \, (1 + \tfrac{1}{2}\,\delta^{2})
+    This gives the correct circular limit ($\kappa=1, \delta=0 \Rightarrow
+    V'= \rho$) and captures the leading shaping effects: elongation scales
+    the cross-section area while triangularity enters at second order.
 
     Parameters
     ----------
-    rho : array
-        Normalised radial coordinate, rho in [0, 1].
+    rho : array (N,)
+        Normalised radial coordinate.
     kappa : float
-        Elongation (>=1).  kappa=1 is circular.
+        Elongation ($\kappa \ge 1$).
     delta : float
-        Triangularity.  delta=0 is symmetric.
+        Triangularity ($0 \le \delta \le 0.5$ typical).
 
     Returns
     -------
-    vp : array (same shape as *rho*)
-        V'(rho).
+    vp : array (N,)
+        $V'(\rho)$ in the same units as the input grid.
     """
-    return np.asarray(rho, dtype=np.float64) * kappa * (1.0 + 0.5 * delta**2)
+    rho = np.asarray(rho, dtype=np.float64)
+    shape_factor = kappa * (1.0 + 0.5 * delta**2)
+    return shape_factor * rho
