@@ -75,12 +75,15 @@ def chi_total(
     chi : ndarray
         Total diffusivity (same shape as *a_over_LTe*).
     """
-    return chi_turbulent(
-        a_over_LTe,
-        chi_s=chi_s,
-        a_over_LTe_crit=a_over_LTe_crit,
-        alpha_s=alpha_s,
-    ) + chi_neo
+    return (
+        chi_turbulent(
+            a_over_LTe,
+            chi_s=chi_s,
+            a_over_LTe_crit=a_over_LTe_crit,
+            alpha_s=alpha_s,
+        )
+        + chi_neo
+    )
 
 
 def normalised_flux(

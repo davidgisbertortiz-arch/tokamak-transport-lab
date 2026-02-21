@@ -58,7 +58,7 @@ def main() -> None:
 
     # ── Seed for reproducibility ─────────────────────────────────
     seed = cfg.get("seed", 42)
-    np.random.seed(seed)  # noqa: NPY002
+    np.random.seed(seed)
 
     # ── Run numerical solver ─────────────────────────────────────
     result = solve(
