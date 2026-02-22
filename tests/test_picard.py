@@ -273,9 +273,7 @@ class TestPicardLoop:
         """Adversarial model (returns extreme chi) triggers fallback."""
         from tokamak_transport_lab.transport.stiffness import chi_total
 
-        def adversarial_model(
-            a_over_lte: np.ndarray, **_: object
-        ) -> np.ndarray:
+        def adversarial_model(a_over_lte: np.ndarray, **_: object) -> np.ndarray:
             # Alternating NaN / huge values → forces fallback
             out = np.full_like(a_over_lte, np.nan)
             return out
