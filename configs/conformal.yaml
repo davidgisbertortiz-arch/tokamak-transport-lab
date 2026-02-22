@@ -1,0 +1,18 @@
+# Split conformal calibration parameters
+
+conformal:
+  alpha: 0.1           # miscoverage level (0.1 → 90 % coverage)
+
+data:
+  calibration: "data/transport_test.npz"   # NPZ with X, y arrays
+
+model:
+  ensemble_dir: "outputs/ensemble"
+  n_members: 5
+  n_features: 6
+  hidden: [128, 128, 64]
+
+  # Normalisation stats produced by train_ensemble / train_surrogate
+  norm_stats: "outputs/ensemble/norm_stats.npz"
+
+output_dir: "outputs/conformal"

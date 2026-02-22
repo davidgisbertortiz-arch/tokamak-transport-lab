@@ -1,6 +1,8 @@
 # Low-power (Ohmic-like) circular scenario
+# Picard-ready: small grid, few sub-steps → runs in ~5 s.
+
 grid:
-  n_rho: 100
+  n_rho: 60
 
 source:
   S0: 0.3
@@ -12,11 +14,20 @@ bc:
 
 solver:
   dt: 1.0e-4
-  n_steps: 5000
   theta: 0.5
+  sub_steps: 200
+
+picard:
+  max_iters: 40
+  tol: 1.0e-3
+  alpha0: 0.5
 
 transport:
-  chi0: 1.0
+  chi_s: 0.5
+  a_over_LTe_crit: 3.0
+  alpha_s: 1.5
+  chi_neo: 0.02
 
 geometry: circular
-seed: 42
+
+output_dir: outputs/picard

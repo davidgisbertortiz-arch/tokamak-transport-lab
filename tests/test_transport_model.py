@@ -9,7 +9,7 @@ from tokamak_transport_lab.transport.stiffness import chi_total, chi_turbulent, 
 
 
 class TestChiTurbulent:
-    """Core stiffness‐model behaviour."""
+    """Core stiffness-model behaviour."""
 
     def test_zero_below_threshold(self) -> None:
         """chi_turb must be exactly 0 when a/L_Te < a/L_Te,crit."""

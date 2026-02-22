@@ -1,6 +1,8 @@
-# Mid-power (H-mode-like) shaped scenario
+# Mid-power (H-mode-like) scenario — reference case
+# Picard-ready: moderate grid, should converge in ~15 s.
+
 grid:
-  n_rho: 100
+  n_rho: 80
 
 source:
   S0: 1.0
@@ -12,11 +14,20 @@ bc:
 
 solver:
   dt: 1.0e-4
-  n_steps: 5000
   theta: 0.5
+  sub_steps: 300
+
+picard:
+  max_iters: 50
+  tol: 1.0e-4
+  alpha0: 0.5
 
 transport:
-  chi0: 1.0
+  chi_s: 1.0
+  a_over_LTe_crit: 3.0
+  alpha_s: 1.5
+  chi_neo: 0.01
 
 geometry: circular
-seed: 42
+
+output_dir: outputs/picard

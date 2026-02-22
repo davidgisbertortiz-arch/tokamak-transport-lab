@@ -1,22 +1,38 @@
-# High-power (ITER-like) scenario
+# High-power (ITER-like) scenario with Miller shaping
+# Picard-ready: moderate grid, elongated geometry → ~20 s.
+
 grid:
-  n_rho: 100
+  n_rho: 80
 
 source:
   S0: 4.0
-  rho_dep: 0.3
-  sigma: 0.1
+  rho_dep: 0.25
+  sigma: 0.12
 
 bc:
   Te_ped: 1500.0
 
 solver:
-  dt: 1.0e-4
-  n_steps: 5000
+  dt: 5.0e-5
   theta: 0.5
+  sub_steps: 400
+
+picard:
+  max_iters: 50
+  tol: 1.0e-4
+  alpha0: 0.4
+  alpha_min: 0.05
+  alpha_max: 0.9
 
 transport:
-  chi0: 1.0
+  chi_s: 2.0
+  a_over_LTe_crit: 2.5
+  alpha_s: 1.5
+  chi_neo: 0.005
 
-geometry: circular
-seed: 42
+geometry: miller
+miller:
+  kappa: 1.7
+  delta: 0.33
+
+output_dir: outputs/picard
