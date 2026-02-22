@@ -129,24 +129,47 @@ This appears as a sink in the $T_e$ equation and a source in the $T_i$
 equation.  In electron-heated scenarios ($S_i = 0$) the physics constraint
 $T_i \leq T_e$ is automatically satisfied.
 
-Run all three reference scenarios with the multichannel solver:
+#### Running scenarios
 
 ```bash
-python -m scripts.run_scenarios
+python -m scripts.run_scenarios                       # all 3 scenarios
+python -m scripts.run_scenarios --scenarios-dir configs/scenarios
+python -m scripts.run_scenarios --output-dir outputs/scenarios
 ```
 
-Outputs to `outputs/scenarios/<scenario>/`:
-- `result.npz` — rho, Te, Ti, chi_e, chi_i, histories
-- `metrics.json` — convergence metadata
-- `comparison_profiles.png` — Te + Ti side-by-side for all scenarios
-- `comparison_convergence.png` — residual histories overlaid
-- `summary.json` — comparison table
+#### Outputs produced
+
+Per scenario (e.g. `outputs/scenarios/mid_power/`):
+
+| File | Description |
+|------|-------------|
+| `result.npz` | Converged profiles: rho, Te, Ti, chi_e, chi_i, residual & alpha histories |
+| `metrics.json` | Convergence metadata (n_iters, wall_time, final_residual, Te/Ti core) |
+
+Global (under `outputs/scenarios/`):
+
+| File | Description |
+|------|-------------|
+| `summary.json` | Comparison table with `n_iters`, `final_residual`, `runtime_s`, `Te0`, `Ti0` per scenario |
+| `scenarios_compare.png` | Te(ρ) and Ti(ρ) overlays for all scenarios |
+| `comparison_convergence.png` | Residual histories overlaid |
+
+#### Reference scenarios
 
 | Scenario | P_heat (S0_e) | Te_ped | Ti_ped | Geometry |
 |----------|:------------:|:------:|:------:|:--------:|
 | `low_power` | 0.3 | 300 eV | 250 eV | Circular |
 | `mid_power` | 1.0 | 500 eV | 400 eV | Circular |
 | `high_power` | 4.0 | 1500 eV | 1200 eV | Miller |
+
+> **Simplifications & caveats:**  This is a *toy educational model*, not a
+> production transport code.  Key simplifications include: (1) synthetic
+> stiffness-based transport — not derived from gyrokinetic simulations;
+> (2) 1-D radial geometry only — no poloidal/toroidal asymmetries beyond
+> a lowest-order Miller shaping factor; (3) a single equilibration time
+> $\tau_{eq}$ rather than a self-consistent collision operator; (4) no
+> impurity radiation, neutral fuelling, or current diffusion.  Results are
+> suitable for learning and prototyping, not for device prediction.
 
 ### Uncertainty (Ensemble + Conformal) & Geometry (Miller-lite)
 

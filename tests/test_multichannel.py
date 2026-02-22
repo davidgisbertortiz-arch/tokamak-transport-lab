@@ -330,3 +330,156 @@ class TestScenarioConvergence:
         )
         assert result.metadata["n_iters"] <= 60
         assert np.isfinite(result.te_final).all()
+
+
+# ── exchange sign test (diffusion off) ───────────────────────────
+
+
+class TestExchangeSignNoDiffusion:
+    """When diffusion is negligible and Te > Ti, one coupling update must
+    decrease Te and increase Ti by roughly the same magnitude."""
+
+    @staticmethod
+    def _flat_chi(a_over_lte: np.ndarray, **_kw: object) -> np.ndarray:
+        """Tiny constant diffusivity — effectively no diffusion."""
+        return np.full_like(a_over_lte, 1e-8)
+
+    def test_te_decreases_ti_increases(self) -> None:
+        """After 1 Picard iter with near-zero χ, coupling moves energy
+        from electrons to ions."""
+        n = 32
+        rho = np.linspace(0.0, 1.0, n)
+        te_init = np.full(n, 1000.0)  # flat, high Te
+        ti_init = np.full(n, 400.0)  # flat, low Ti
+
+        result = run_picard_multichannel(
+            n_rho=n,
+            te_ped=1000.0,
+            ti_ped=400.0,
+            s0_e=0.0,           # no external heating
+            s0_i=0.0,
+            density=2.0,
+            tau_eq=0.005,       # strong coupling
+            transport_model_e=self._flat_chi,
+            transport_model_i=self._flat_chi,
+            dt=1e-3,
+            theta=0.5,
+            sub_steps=50,
+            max_iters=1,        # single iteration
+            tol=1e-12,
+            alpha0=1.0,         # no under-relaxation
+            te_init=te_init,
+            ti_init=ti_init,
+        )
+
+        # Interior points (exclude boundary which is Dirichlet)
+        interior = slice(1, -1)
+        # Te must have decreased
+        assert (result.te_final[interior] < te_init[interior]).all(), (
+            "Te should decrease when Te > Ti with coupling on"
+        )
+        # Ti must have increased
+        assert (result.ti_final[interior] > ti_init[interior]).all(), (
+            "Ti should increase when Te > Ti with coupling on"
+        )
+
+    def test_sign_opposite_trends(self) -> None:
+        """The change in Te and Ti should be of opposite sign (energy
+        conservation at each grid point)."""
+        n = 32
+        te_init = np.full(n, 800.0)
+        ti_init = np.full(n, 300.0)
+
+        result = run_picard_multichannel(
+            n_rho=n,
+            te_ped=800.0,
+            ti_ped=300.0,
+            s0_e=0.0,
+            s0_i=0.0,
+            density=1.5,
+            tau_eq=0.01,
+            transport_model_e=self._flat_chi,
+            transport_model_i=self._flat_chi,
+            dt=1e-3,
+            sub_steps=50,
+            max_iters=1,
+            tol=1e-12,
+            alpha0=1.0,
+            te_init=te_init,
+            ti_init=ti_init,
+        )
+
+        delta_te = result.te_final[1:-1] - te_init[1:-1]
+        delta_ti = result.ti_final[1:-1] - ti_init[1:-1]
+
+        # Opposite signs everywhere interior
+        assert (delta_te * delta_ti < 0).all(), (
+            "Delta(Te) and Delta(Ti) must have opposite signs"
+        )
+
+
+# ── end-to-end sanity (tiny grid, fast) ──────────────────────────
+
+
+class TestEndToEndSanity:
+    """Quick integration test on a small grid (N=32) — must complete
+    in < 5 s and produce physically plausible output."""
+
+    def test_no_nans_positive_temps(self) -> None:
+        """Profiles must be NaN-free and strictly positive."""
+        result = run_picard_multichannel(
+            n_rho=32,
+            te_ped=500.0,
+            ti_ped=400.0,
+            s0_e=1.0,
+            s0_i=0.0,
+            density=1.0,
+            tau_eq=0.01,
+            transport_model_e=chi_total,
+            transport_params_e={"chi_s": 1.0, "chi_neo": 0.5},
+            transport_model_i=chi_total,
+            transport_params_i={"chi_s": 0.5, "chi_neo": 0.5},
+            dt=1e-4,
+            sub_steps=100,
+            max_iters=20,
+            tol=1e-3,
+            alpha0=0.3,
+        )
+        assert np.isfinite(result.te_final).all()
+        assert np.isfinite(result.ti_final).all()
+        assert (result.te_final > 0).all()
+        assert (result.ti_final > 0).all()
+
+    def test_mean_ti_increases_with_electron_heating(self) -> None:
+        """In an electron-heated scenario, equilibration should raise
+        mean(Ti) above the initial flat profile."""
+        n = 32
+        ti_ped = 400.0
+        ti_init = np.linspace(ti_ped + 100.0, ti_ped, n)  # gentle slope
+        mean_ti_init = float(ti_init.mean())
+
+        result = run_picard_multichannel(
+            n_rho=n,
+            te_ped=600.0,
+            ti_ped=ti_ped,
+            s0_e=2.0,           # strong electron heating
+            s0_i=0.0,
+            density=1.0,
+            tau_eq=0.005,       # strong coupling
+            transport_model_e=chi_total,
+            transport_params_e={"chi_s": 1.0, "chi_neo": 0.5},
+            transport_model_i=chi_total,
+            transport_params_i={"chi_s": 0.5, "chi_neo": 0.5},
+            dt=1e-4,
+            sub_steps=200,
+            max_iters=30,
+            tol=1e-3,
+            alpha0=0.3,
+            ti_init=ti_init,
+        )
+
+        mean_ti_final = float(result.ti_final.mean())
+        assert mean_ti_final > mean_ti_init, (
+            f"mean(Ti) should increase: init={mean_ti_init:.1f} → "
+            f"final={mean_ti_final:.1f}"
+        )
