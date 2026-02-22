@@ -30,6 +30,7 @@ from tokamak_transport_lab.integration.multichannel_picard import (
     MultichannelResult,
     run_picard_multichannel,
 )
+from tokamak_transport_lab.transport.ion_transport import make_ion_transport
 from tokamak_transport_lab.transport.stiffness import chi_total
 
 # ── defaults ─────────────────────────────────────────────────────
@@ -159,7 +160,18 @@ def run_one_scenario(cfg: dict) -> MultichannelResult:
     div_patience = _get(cfg, "picard", "divergence_patience", _PICARD_DEFAULTS)
 
     params_e = _transport_params(cfg, "transport_e")
-    params_i = _transport_params(cfg, "transport_i")
+
+    # Ion transport: factory dispatches on ti_transport_mode
+    ti_mode = cfg.get("ti_transport_mode", "stiffness")
+    qi_factor = cfg.get("qi_factor", 1.0)
+    params_i_raw = _transport_params(cfg, "transport_i")
+    ion_model, ion_params = make_ion_transport(
+        mode=ti_mode,
+        electron_model=chi_total,
+        electron_params=params_e,
+        qi_factor=qi_factor,
+        ion_params=params_i_raw,
+    )
 
     # Geometry
     v_prime_fn = None
@@ -187,8 +199,8 @@ def run_one_scenario(cfg: dict) -> MultichannelResult:
         v_prime_fn=v_prime_fn,
         transport_model_e=chi_total,
         transport_params_e=params_e,
-        transport_model_i=chi_total,
-        transport_params_i=params_i,
+        transport_model_i=ion_model,
+        transport_params_i=ion_params,
         dt=dt,
         theta=theta,
         sub_steps=sub_steps,

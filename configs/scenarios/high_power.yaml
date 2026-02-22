@@ -36,11 +36,17 @@ transport_e:
   alpha_s: 1.5
   chi_neo: 0.005
 
+# ti_transport_mode: "stiffness" (independent model) or "scaled_qe" (chi_i = qi_factor * chi_e)
+ti_transport_mode: stiffness
+
 transport_i:
   chi_s: 1.0
   a_over_LTe_crit: 3.0
   alpha_s: 1.5
   chi_neo: 0.005
+
+# Only used when ti_transport_mode = scaled_qe
+qi_factor: 0.7
 
 geometry: miller
 miller:
