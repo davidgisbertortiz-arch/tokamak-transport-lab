@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from tokamak_transport_lab.integration.multichannel_picard import (
     MultichannelResult,
     equilibration_source,
@@ -348,7 +347,6 @@ class TestExchangeSignNoDiffusion:
         """After 1 Picard iter with near-zero χ, coupling moves energy
         from electrons to ions."""
         n = 32
-        rho = np.linspace(0.0, 1.0, n)
         te_init = np.full(n, 1000.0)  # flat, high Te
         ti_init = np.full(n, 400.0)  # flat, low Ti
 

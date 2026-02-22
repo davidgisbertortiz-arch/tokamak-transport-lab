@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from tokamak_transport_lab.solver.multichannel import (
     _exchange_step,
     solve_two_channel,
@@ -140,7 +139,6 @@ class TestSolveTwoChannel:
     def test_custom_source_arrays(self) -> None:
         """Accepts pre-computed source arrays."""
         n = 30
-        rho = np.linspace(0.0, 1.0, n)
         src = np.ones(n) * 0.5
         out = solve_two_channel(
             n_rho=n, source_e=src, source_i=src * 0.3, n_steps=50

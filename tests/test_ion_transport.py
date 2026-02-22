@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from tokamak_transport_lab.transport.ion_transport import (
     ScaledQeTransport,
     chi_total_ion,
@@ -139,7 +138,7 @@ class TestMakeIonTransport:
         np.testing.assert_allclose(chi_i, 0.6 * chi_e, rtol=1e-12)
 
     def test_default_mode_is_stiffness(self) -> None:
-        model, params = make_ion_transport()
+        model, _params = make_ion_transport()
         assert model is chi_total_ion
 
     def test_invalid_mode_raises(self) -> None:
