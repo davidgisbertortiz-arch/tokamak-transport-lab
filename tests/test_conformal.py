@@ -70,3 +70,27 @@ class TestSplitConformal:
         sc = SplitConformal()
         with pytest.raises(RuntimeError, match="fit"):
             sc.interval(np.array([1.0]))
+
+    def test_predict_interval_alias_works(self, calibrated: SplitConformal) -> None:
+        """predict_interval() is an alias for interval()."""
+        yhat = np.array([0.0, 1.0])
+        lo1, hi1 = calibrated.interval(yhat)
+        lo2, hi2 = calibrated.predict_interval(yhat)
+        np.testing.assert_array_equal(lo1, lo2)
+        np.testing.assert_array_equal(hi1, hi2)
+
+    def test_torch_tensor_input(self) -> None:
+        """fit() and interval() should accept torch tensors."""
+        torch = pytest.importorskip("torch")
+        rng = np.random.default_rng(11)
+        y = rng.normal(size=200)
+        yhat = y + rng.normal(0, 0.1, size=200)
+
+        sc = SplitConformal()
+        sc.fit(torch.from_numpy(y), torch.from_numpy(yhat), alpha=0.1)
+        assert sc.q_hat is not None
+
+        lo, hi = sc.predict_interval(torch.from_numpy(yhat))
+        assert isinstance(lo, np.ndarray)
+        cov = np.mean((y >= lo) & (y <= hi))
+        assert cov >= 0.85

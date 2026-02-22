@@ -140,3 +140,97 @@ def reliability_bins_gaussian(
 
     expected = np.full(n_bins, 1.0 / n_bins)
     return {"bin_centres": centres, "observed": observed, "expected": expected}
+
+
+# ── interval-based UQ metrics ───────────────────────────────────
+
+
+def ece_regression_interval(
+    y_true: NDArray[np.float64],
+    lower: NDArray[np.float64],
+    upper: NDArray[np.float64],
+    *,
+    n_bins: int = 10,
+) -> float:
+    """Expected Calibration Error for prediction intervals.
+
+    Bins samples by interval width and compares per-bin empirical
+    coverage to the overall average coverage.
+
+    Parameters
+    ----------
+    y_true : array (n,)
+    lower, upper : array (n,)
+        Prediction interval bounds.
+    n_bins : int
+        Number of width-quantile bins.
+
+    Returns
+    -------
+    ece : float
+        Weighted absolute calibration error.
+    """
+    y_true = np.asarray(y_true, dtype=np.float64)
+    lower = np.asarray(lower, dtype=np.float64)
+    upper = np.asarray(upper, dtype=np.float64)
+
+    widths = upper - lower
+    contained = (y_true >= lower) & (y_true <= upper)
+    overall_cov = float(contained.mean())
+
+    n = len(y_true)
+    bin_edges = np.quantile(widths, np.linspace(0.0, 1.0, n_bins + 1))
+    bin_edges[-1] += 1e-10  # include rightmost point
+
+    ece = 0.0
+    for lo_edge, hi_edge in itertools.pairwise(bin_edges):
+        mask = (widths >= lo_edge) & (widths < hi_edge)
+        count = int(mask.sum())
+        if count == 0:
+            continue
+        bin_cov = float(contained[mask].mean())
+        ece += (count / n) * abs(bin_cov - overall_cov)
+    return ece
+
+
+def reliability_bins_interval(
+    y_true: NDArray[np.float64],
+    lower: NDArray[np.float64],
+    upper: NDArray[np.float64],
+    *,
+    n_bins: int = 10,
+) -> dict[str, NDArray[np.float64]]:
+    """Reliability diagram data for prediction intervals.
+
+    Bins samples by interval width and returns per-bin empirical coverage
+    and mean interval width.
+
+    Returns
+    -------
+    data : dict
+        ``"bin_centres"``   — (n_bins,) midpoints of width-based bins.
+        ``"observed_cov"``  — (n_bins,) per-bin empirical coverage.
+        ``"mean_width"``    — (n_bins,) per-bin mean interval width.
+    """
+    y_true = np.asarray(y_true, dtype=np.float64)
+    lower = np.asarray(lower, dtype=np.float64)
+    upper = np.asarray(upper, dtype=np.float64)
+
+    widths = upper - lower
+    contained = (y_true >= lower) & (y_true <= upper)
+    bin_edges = np.quantile(widths, np.linspace(0.0, 1.0, n_bins + 1))
+    bin_edges[-1] += 1e-10
+
+    centres = np.zeros(n_bins)
+    obs_cov = np.zeros(n_bins)
+    mean_w = np.zeros(n_bins)
+
+    for k, (lo_edge, hi_edge) in enumerate(itertools.pairwise(bin_edges)):
+        mask = (widths >= lo_edge) & (widths < hi_edge)
+        centres[k] = 0.5 * (lo_edge + hi_edge)
+        count = int(mask.sum())
+        if count > 0:
+            obs_cov[k] = float(contained[mask].mean())
+            mean_w[k] = float(widths[mask].mean())
+
+    return {"bin_centres": centres, "observed_cov": obs_cov, "mean_width": mean_w}

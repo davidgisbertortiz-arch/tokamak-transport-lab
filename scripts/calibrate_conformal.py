@@ -89,7 +89,6 @@ def main() -> None:
     ensemble = DeepEnsemble.load(
         ens_dir,
         model_factory=TransportMLP,
-        n_members=n_members,
         n_features=n_features,
         hidden=hidden,
     )
@@ -119,7 +118,7 @@ def main() -> None:
     print(f"Saved → {conformal_path}")
 
     # ── Empirical coverage check ─────────────────────────────────
-    lo, hi = sc.interval(yhat_cal)
+    lo, hi = sc.predict_interval(yhat_cal)
     cov = coverage(y_cal, lo, hi)
     print(f"Empirical coverage on calibration set: {cov:.4f}  (target ≥ {1 - alpha:.2f})")
 

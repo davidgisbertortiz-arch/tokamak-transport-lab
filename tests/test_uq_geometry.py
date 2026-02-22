@@ -7,8 +7,10 @@ import pytest
 
 from tokamak_transport_lab.evaluation.metrics import (
     coverage,
+    ece_regression_interval,
     regression_ece_gaussian,
     reliability_bins_gaussian,
+    reliability_bins_interval,
 )
 from tokamak_transport_lab.geometry.circular import v_prime
 from tokamak_transport_lab.geometry.miller import vprime_miller
@@ -95,3 +97,29 @@ class TestRegressionECE:
         assert data["bin_centres"].shape == (10,)
         assert data["observed"].shape == (10,)
         assert data["expected"].shape == (10,)
+
+
+class TestIntervalECE:
+    """Expected Calibration Error for prediction intervals."""
+
+    def test_perfect_intervals_low_ece(self) -> None:
+        """Constant-width intervals around truth → low ECE."""
+        rng = np.random.default_rng(7)
+        n = 2000
+        y = rng.normal(0, 1, n)
+        lo = y - 2.0
+        hi = y + 2.0
+        ece = ece_regression_interval(y, lo, hi, n_bins=5)
+        assert ece < 0.05, f"ECE = {ece:.4f}"
+
+    def test_reliability_bins_interval_shape(self) -> None:
+        rng = np.random.default_rng(0)
+        n = 200
+        y = rng.normal(size=n)
+        half_w = rng.uniform(0.5, 3.0, size=n)
+        lo = y - half_w
+        hi = y + half_w
+        data = reliability_bins_interval(y, lo, hi, n_bins=5)
+        assert data["bin_centres"].shape == (5,)
+        assert data["observed_cov"].shape == (5,)
+        assert data["mean_width"].shape == (5,)

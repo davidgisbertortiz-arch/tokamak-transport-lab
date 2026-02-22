@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 
 import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 from tokamak_transport_lab.surrogate.ensemble import DeepEnsemble
 from tokamak_transport_lab.surrogate.mlp import TransportMLP
@@ -12,8 +13,12 @@ from tokamak_transport_lab.surrogate.mlp import TransportMLP
 
 def _make_ensemble(n: int = 3) -> DeepEnsemble:
     """Create a small ensemble of randomly-initialised MLPs."""
-    members = [TransportMLP(n_features=6, hidden=(16, 8)) for _ in range(n)]
-    return DeepEnsemble(members)
+    return DeepEnsemble(
+        TransportMLP,
+        n_members=n,
+        n_features=6,
+        hidden=(16, 8),
+    )
 
 
 class TestDeepEnsemble:
@@ -25,14 +30,13 @@ class TestDeepEnsemble:
         result = ens.predict(x)
         assert result["mean"].shape == (10, 1)
         assert result["epistemic_std"].shape == (10, 1)
-        assert result["members"].shape == (3, 10, 1)
+        assert result["member_means"].shape == (3, 10, 1)
 
     def test_epistemic_std_positive(self) -> None:
         """With different random inits, std should be > 0 almost everywhere."""
         ens = _make_ensemble(5)
         x = torch.randn(50, 6)
         result = ens.predict(x)
-        # At least most points should have nonzero std
         assert (result["epistemic_std"] > 0).float().mean() > 0.5
 
     def test_predict_members(self) -> None:
@@ -55,7 +59,6 @@ class TestDeepEnsemble:
             loaded = DeepEnsemble.load(
                 tmp,
                 model_factory=TransportMLP,
-                n_members=2,
                 n_features=6,
                 hidden=(16, 8),
             )
@@ -69,5 +72,22 @@ class TestDeepEnsemble:
         x = torch.randn(5, 6)
         result = ens.predict(x)
         assert result["mean"].shape == (5, 1)
-        # std is 0 with a single member
         assert (result["epistemic_std"] == 0).all()
+
+    def test_fit_reduces_loss(self) -> None:
+        """fit() should reduce training loss over a toy regression task."""
+        ens = DeepEnsemble(
+            TransportMLP,
+            n_members=2,
+            seeds=[0, 1],
+            n_features=6,
+            hidden=(16, 8),
+        )
+        torch.manual_seed(42)
+        x = torch.randn(64, 6)
+        y = x[:, 0:1] * 2 + x[:, 1:2]
+        dl = DataLoader(TensorDataset(x, y), batch_size=16, shuffle=True)
+        histories = ens.fit(dl, epochs=30, lr=1e-2)
+        for key, hist in histories.items():
+            losses = hist["train_loss"]
+            assert losses[-1] < losses[0], f"{key}: final >= initial"
