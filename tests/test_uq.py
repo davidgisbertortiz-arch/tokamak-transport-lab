@@ -47,7 +47,9 @@ class TestDeepEnsembleUQ:
         """fit() should reduce training loss over a toy regression task."""
         ens = DeepEnsemble(
             model_factory=lambda: nn.Sequential(
-                nn.Linear(2, 16), nn.ReLU(), nn.Linear(16, 1),
+                nn.Linear(2, 16),
+                nn.ReLU(),
+                nn.Linear(16, 1),
             ),
             n_members=2,
             seeds=[0, 1],

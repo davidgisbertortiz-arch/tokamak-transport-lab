@@ -137,13 +137,15 @@ def main() -> None:
         with torch.no_grad():
             y_pred_n = model(torch.from_numpy(X_test_n)).squeeze(-1).numpy()
         y_pred = y_pred_n * y_std + y_mean
-        member_metrics.append({
-            "member": i,
-            "seed": seed,
-            "r2": r2_score(y_test, y_pred),
-            "mae": mae(y_test, y_pred),
-            "max_error": max_error(y_test, y_pred),
-        })
+        member_metrics.append(
+            {
+                "member": i,
+                "seed": seed,
+                "r2": r2_score(y_test, y_pred),
+                "mae": mae(y_test, y_pred),
+                "max_error": max_error(y_test, y_pred),
+            }
+        )
 
     ens_metrics = {
         "r2": r2_score(y_test, ens_mean),
@@ -168,15 +170,17 @@ def main() -> None:
     meta_path = out_dir / "metadata.json"
     with open(meta_path) as f:
         metadata = json.load(f)
-    metadata.update({
-        "epochs": epochs,
-        "batch_size": batch_size,
-        "lr": lr,
-        "hidden": list(hidden),
-        "n_features": n_features,
-        "git_hash": _git_hash(),
-        "config_file": str(args.config),
-    })
+    metadata.update(
+        {
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "lr": lr,
+            "hidden": list(hidden),
+            "n_features": n_features,
+            "git_hash": _git_hash(),
+            "config_file": str(args.config),
+        }
+    )
     with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=2)
     print(f"Metadata → {meta_path}")
