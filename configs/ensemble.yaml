@@ -1,0 +1,20 @@
+# Deep Ensemble training parameters
+
+ensemble:
+  n_members: 5
+  base_seed: 100       # member i uses seed = base_seed + i
+
+model:
+  n_features: 6
+  hidden: [128, 128, 64]
+
+training:
+  epochs: 100
+  batch_size: 512
+  lr: 1.0e-3
+
+data:
+  train: "data/transport_train.npz"
+  test:  "data/transport_test.npz"
+
+output_dir: "outputs/ensemble"
