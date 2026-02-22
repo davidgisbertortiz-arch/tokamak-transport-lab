@@ -18,12 +18,12 @@ if TYPE_CHECKING:
 
 # Default LHS sampling bounds for 6 input dimensions
 DEFAULT_BOUNDS: list[tuple[float, float]] = [
-    (0.5, 12.0),   # a/L_Te
-    (1.0, 5.0),    # q (safety factor)
-    (0.1, 3.0),    # s_hat (magnetic shear)
-    (0.01, 2.0),   # nu_star (collisionality)
-    (0.5, 5.0),    # chi_s (stiffness coefficient)
-    (2.0, 6.0),    # a/L_Te,crit (critical gradient)
+    (0.5, 12.0),  # a/L_Te
+    (1.0, 5.0),  # q (safety factor)
+    (0.1, 3.0),  # s_hat (magnetic shear)
+    (0.01, 2.0),  # nu_star (collisionality)
+    (0.5, 5.0),  # chi_s (stiffness coefficient)
+    (2.0, 6.0),  # a/L_Te,crit (critical gradient)
 ]
 
 FEATURE_NAMES: list[str] = [

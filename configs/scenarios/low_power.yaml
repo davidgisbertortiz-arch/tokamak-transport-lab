@@ -5,12 +5,18 @@ grid:
   n_rho: 60
 
 source:
-  S0: 0.3
+  S0_e: 0.3
+  S0_i: 0.0
   rho_dep: 0.3
   sigma: 0.1
 
 bc:
   Te_ped: 300.0
+  Ti_ped: 250.0
+
+coupling:
+  density: 1.0
+  tau_eq: 0.02
 
 solver:
   dt: 1.0e-4
@@ -22,12 +28,18 @@ picard:
   tol: 1.0e-3
   alpha0: 0.5
 
-transport:
+transport_e:
   chi_s: 0.5
   a_over_LTe_crit: 3.0
   alpha_s: 1.5
   chi_neo: 0.02
 
+transport_i:
+  chi_s: 0.3
+  a_over_LTe_crit: 4.0
+  alpha_s: 1.5
+  chi_neo: 0.02
+
 geometry: circular
 
-output_dir: outputs/picard
+output_dir: outputs/scenarios

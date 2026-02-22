@@ -140,9 +140,10 @@ def main() -> None:
     # ── Unpack config with defaults ──────────────────────────────
     n_rho = cfg.get("grid", {}).get("n_rho", 100)
     te_ped = cfg.get("bc", {}).get("Te_ped", 500.0)
-    s0 = cfg.get("source", {}).get("S0", 1.0)
-    rho_dep = cfg.get("source", {}).get("rho_dep", 0.3)
-    sigma = cfg.get("source", {}).get("sigma", 0.1)
+    source_cfg = cfg.get("source", {})
+    s0 = source_cfg.get("S0", source_cfg.get("S0_e", 1.0))
+    rho_dep = source_cfg.get("rho_dep", 0.3)
+    sigma = source_cfg.get("sigma", 0.1)
 
     dt = _get(cfg, "solver", "dt", _SOLVER_DEFAULTS)
     theta = _get(cfg, "solver", "theta", _SOLVER_DEFAULTS)
@@ -155,7 +156,7 @@ def main() -> None:
     alpha_max = _get(cfg, "picard", "alpha_max", _PICARD_DEFAULTS)
     div_patience = _get(cfg, "picard", "divergence_patience", _PICARD_DEFAULTS)
 
-    transport_cfg = cfg.get("transport", {})
+    transport_cfg = cfg.get("transport_e", cfg.get("transport", {}))
     transport_params = {
         "chi_s": transport_cfg.get("chi_s", _TRANSPORT_DEFAULTS["chi_s"]),
         "a_over_LTe_crit": transport_cfg.get(

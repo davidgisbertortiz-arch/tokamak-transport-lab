@@ -8,7 +8,7 @@
 
 ## Overview
 
-**tokamak-transport-lab** couples a custom 1-D Crank–Nicolson diffusion solver with a deep-ensemble ML surrogate of turbulent transport in a self-consistent Picard iteration loop, producing predictive plasma temperature profiles with calibrated uncertainty.
+**tokamak-transport-lab** couples a custom 1-D Crank–Nicolson diffusion solver with a deep-ensemble ML surrogate of turbulent transport in a self-consistent Picard iteration loop, producing predictive plasma temperature profiles with calibrated uncertainty.  The solver supports **coupled electron–ion** ($T_e$–$T_i$) channels with collisional equilibration.
 
 ```
 Config (YAML)  ──▶  Solver (CN-FDM)  ──▶  Profiles + Plots + NPZ
@@ -118,6 +118,36 @@ Outputs to `outputs/picard/demo/`:
 Three scenarios are provided: `low_power`, `mid_power`, `high_power`
 (the last uses Miller geometry).  Each runs end-to-end in under 60 s.
 
+### Multi-Channel Scenarios (Te + Ti)
+
+The solver supports coupled electron–ion temperature evolution.  A
+collisional equilibration term transfers energy between channels:
+
+$$S_{ei} = \frac{3}{2}\,n\,\frac{T_e - T_i}{\tau_{eq}}$$
+
+This appears as a sink in the $T_e$ equation and a source in the $T_i$
+equation.  In electron-heated scenarios ($S_i = 0$) the physics constraint
+$T_i \leq T_e$ is automatically satisfied.
+
+Run all three reference scenarios with the multichannel solver:
+
+```bash
+python -m scripts.run_scenarios
+```
+
+Outputs to `outputs/scenarios/<scenario>/`:
+- `result.npz` — rho, Te, Ti, chi_e, chi_i, histories
+- `metrics.json` — convergence metadata
+- `comparison_profiles.png` — Te + Ti side-by-side for all scenarios
+- `comparison_convergence.png` — residual histories overlaid
+- `summary.json` — comparison table
+
+| Scenario | P_heat (S0_e) | Te_ped | Ti_ped | Geometry |
+|----------|:------------:|:------:|:------:|:--------:|
+| `low_power` | 0.3 | 300 eV | 250 eV | Circular |
+| `mid_power` | 1.0 | 500 eV | 400 eV | Circular |
+| `high_power` | 4.0 | 1500 eV | 1200 eV | Miller |
+
 ### Uncertainty (Ensemble + Conformal) & Geometry (Miller-lite)
 
 Train a Deep Ensemble (5 members by default, each with its own seed).
@@ -207,7 +237,8 @@ tokamak-transport-lab/
 | 5  | CI sanity + formatting + LaTeX physics README | ✅ |
 | 6  | Ensemble UQ + conformal + Miller geometry | ✅ |
 | 7  | Picard loop + safeguards + convergence + CLI | ✅ |
-| 8+ | Visuals, Streamlit | 🔜 |
+| 8  | Multi-channel Te–Ti + scenario configs + runner | ✅ |
+| 9+ | Visuals, Streamlit | 🔜 |
 
 ## License
 

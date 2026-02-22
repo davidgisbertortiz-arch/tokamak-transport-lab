@@ -195,7 +195,7 @@ cython_debug/
 outputs/
 
 # Project-specific: large generated datasets
-data/
+/data/
 
 # PyPI configuration file
 .pypirc
