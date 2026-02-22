@@ -102,7 +102,9 @@ Outputs to `outputs/surrogate/`: `model.pt`, `metrics.json`, `calibration.png`.
 
 ### Uncertainty (Ensemble + Conformal) & Geometry (Miller-lite)
 
-Train a Deep Ensemble (5 members by default, each with a different seed):
+Train a Deep Ensemble (5 members by default, each with its own seed).
+The `DeepEnsemble` class takes a *model_factory* and handles per-member
+seeding, training, and aggregation:
 
 ```bash
 python -m scripts.train_ensemble --config configs/ensemble.yaml
@@ -119,6 +121,19 @@ python -m scripts.calibrate_conformal --config configs/conformal.yaml
 
 Outputs to `outputs/conformal/`: `conformal.json` ($\hat{q}$, $\alpha$, timestamp),
 `summary.json` (empirical coverage check).
+
+Quick demo — mean ± conformal band in Python:
+
+```python
+from tokamak_transport_lab.surrogate import DeepEnsemble, SplitConformal, TransportMLP
+import torch, numpy as np
+
+ens = DeepEnsemble.load("outputs/ensemble", TransportMLP, n_features=6, hidden=(128,128,64))
+sc  = SplitConformal.load("outputs/conformal/conformal.json")
+x   = torch.randn(100, 6)
+out = ens.predict(x)
+lo, hi = sc.predict_interval(out["mean"].squeeze().numpy())
+```
 
 **Miller geometry** — the solver can use a shaped flux-surface volume element
 $V'(\rho) \approx \kappa(1 + \tfrac{1}{2}\delta^2)\rho$ instead of the

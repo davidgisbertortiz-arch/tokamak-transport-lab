@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 
 from tokamak_transport_lab.surrogate.conformal import SplitConformal
 from tokamak_transport_lab.surrogate.ensemble import DeepEnsemble
@@ -15,12 +16,11 @@ from tokamak_transport_lab.surrogate.ensemble import DeepEnsemble
 
 def _make_linear_ensemble(n_members: int = 3, seed: int = 0) -> DeepEnsemble:
     """Build a DeepEnsemble from tiny 2→1 Linear modules with *different* weights."""
-    members: list[nn.Module] = []
-    for i in range(n_members):
-        torch.manual_seed(seed + i)
-        m = nn.Linear(2, 1)
-        members.append(m)
-    return DeepEnsemble(members)
+    return DeepEnsemble(
+        model_factory=lambda: nn.Linear(2, 1),
+        n_members=n_members,
+        seeds=[seed + i for i in range(n_members)],
+    )
 
 
 class TestDeepEnsembleUQ:
@@ -34,7 +34,6 @@ class TestDeepEnsembleUQ:
         result = ens.predict(x)
         std = result["epistemic_std"]
         assert std.shape == (8, 1)
-        # All points should show non-zero epistemic uncertainty
         assert (std > 0).all(), f"Expected all std > 0, got {std.squeeze().tolist()}"
 
     def test_mean_is_finite(self) -> None:
@@ -43,6 +42,24 @@ class TestDeepEnsembleUQ:
         result = ens.predict(x)
         assert torch.isfinite(result["mean"]).all()
         assert torch.isfinite(result["epistemic_std"]).all()
+
+    def test_fit_reduces_loss(self) -> None:
+        """fit() should reduce training loss over a toy regression task."""
+        ens = DeepEnsemble(
+            model_factory=lambda: nn.Sequential(
+                nn.Linear(2, 16), nn.ReLU(), nn.Linear(16, 1),
+            ),
+            n_members=2,
+            seeds=[0, 1],
+        )
+        torch.manual_seed(42)
+        x = torch.randn(64, 2)
+        y = (x[:, 0:1] * 2 + x[:, 1:2]).float()
+        dl = DataLoader(TensorDataset(x, y), batch_size=16, shuffle=True)
+        histories = ens.fit(dl, epochs=30, lr=1e-2)
+        for key, hist in histories.items():
+            losses = hist["train_loss"]
+            assert losses[-1] < losses[0], f"{key}: final loss >= initial"
 
 
 # ── SplitConformal coverage on synthetic data ────────────────────
@@ -66,10 +83,28 @@ class TestSplitConformalCoverage:
         sc = SplitConformal()
         sc.fit(y[:n_cal], yhat[:n_cal], alpha=alpha)
 
-        lo, hi = sc.interval(yhat[n_cal:])
+        lo, hi = sc.predict_interval(yhat[n_cal:])
         cov = float(np.mean((y[n_cal:] >= lo) & (y[n_cal:] <= hi)))
 
         target = 1.0 - alpha
         assert abs(cov - target) < 0.05, (
             f"alpha={alpha}: coverage={cov:.3f}, expected ≈ {target:.2f}"
         )
+
+    def test_torch_tensor_input(self) -> None:
+        """SplitConformal should accept torch tensors transparently."""
+        rng = np.random.default_rng(0)
+        n = 500
+        y_np = rng.normal(0, 1, size=n)
+        yhat_np = y_np + rng.normal(0, 0.1, size=n)
+
+        y_t = torch.from_numpy(y_np)
+        yhat_t = torch.from_numpy(yhat_np)
+
+        sc = SplitConformal()
+        sc.fit(y_t, yhat_t, alpha=0.1)
+        assert sc.q_hat is not None and sc.q_hat > 0
+
+        lo, _hi = sc.predict_interval(yhat_t)
+        assert isinstance(lo, np.ndarray)
+        assert lo.shape == (n,)
