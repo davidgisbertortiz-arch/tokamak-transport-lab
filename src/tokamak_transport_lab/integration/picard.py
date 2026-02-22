@@ -223,10 +223,7 @@ def run_picard(
     rho = np.linspace(0.0, 1.0, n_rho)
     source = gaussian_source(rho, s0=s0, rho_dep=rho_dep, sigma=sigma)
 
-    if v_prime_fn is None:
-        vp = circ_vprime(rho)
-    else:
-        vp = v_prime_fn(rho)
+    vp = circ_vprime(rho) if v_prime_fn is None else v_prime_fn(rho)
 
     if transport_model is None:
         transport_model = default_chi

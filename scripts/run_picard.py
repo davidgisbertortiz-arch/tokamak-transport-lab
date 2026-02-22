@@ -27,8 +27,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 
-from tokamak_transport_lab.integration.picard import run_picard
-
+from tokamak_transport_lab.integration.picard import (
+    run_picard,
+)
 
 # ── defaults matching configs/picard.yaml ────────────────────────
 
@@ -132,9 +133,7 @@ def main() -> None:
 
     # ── Output directory: <base>/<run_id>/ ───────────────────────
     base_dir = pathlib.Path(args.output_dir or cfg.get("output_dir", "outputs/picard"))
-    run_id = args.run_id or datetime.datetime.now(tz=datetime.UTC).strftime(
-        "%Y%m%dT%H%M%S"
-    )
+    run_id = args.run_id or datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%S")
     out_dir = base_dir / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
 

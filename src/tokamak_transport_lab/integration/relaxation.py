@@ -46,10 +46,7 @@ def update_alpha(
     if residual_prev is None:
         return max(alpha_min, min(alpha, alpha_max))
 
-    if residual_curr < residual_prev:
-        alpha_new = alpha + step_up
-    else:
-        alpha_new = alpha / 2.0
+    alpha_new = alpha + step_up if residual_curr < residual_prev else alpha / 2.0
 
     return max(alpha_min, min(alpha_new, alpha_max))
 

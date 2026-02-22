@@ -100,10 +100,7 @@ class SurrogateAdapter:
 
         # Build feature matrix: [a/L_Te, extra1, extra2, …]
         extras = np.array(list(self.extra_features.values()), dtype=np.float64)
-        if extras.size:
-            x = np.column_stack([a, np.tile(extras, (n, 1))])
-        else:
-            x = a[:, np.newaxis]
+        x = np.column_stack([a, np.tile(extras, (n, 1))]) if extras.size else a[:, np.newaxis]
 
         with torch.no_grad():
             t_in = torch.tensor(x, dtype=torch.float32)
@@ -159,10 +156,7 @@ class SurrogateWithUQAdapter:
         n = len(a)
 
         extras = np.array(list(self.extra_features.values()), dtype=np.float64)
-        if extras.size:
-            x = np.column_stack([a, np.tile(extras, (n, 1))])
-        else:
-            x = a[:, np.newaxis]
+        x = np.column_stack([a, np.tile(extras, (n, 1))]) if extras.size else a[:, np.newaxis]
 
         with torch.no_grad():
             t_in = torch.tensor(x, dtype=torch.float32)

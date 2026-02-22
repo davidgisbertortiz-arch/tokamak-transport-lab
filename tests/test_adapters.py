@@ -37,9 +37,7 @@ class TestAnalyticAdapter:
 class _FakeMLP:
     """Minimal torch-like model returning Q_norm = 0.5 * a/L_Te."""
 
-    def __call__(self, x):  
-        import torch
-
+    def __call__(self, x):
         # First column is a/L_Te; return Q = 0.5 * a_over_lte
         return (0.5 * x[:, 0:1]).float()
 
@@ -63,7 +61,7 @@ class TestSurrogateAdapter:
         """Extra features expand the input dimension correctly."""
 
         class _WiderMLP:
-            def __call__(self, x):  
+            def __call__(self, x):
                 import torch
 
                 # Expect 3 columns: a_over_lte + 2 extras
@@ -148,9 +146,9 @@ class TestParityReport:
         assert report["max_rel_error"] > 0.01
 
     def test_save_report(self, tmp_path) -> None:
-        from tokamak_transport_lab.evaluation.benchmarks import save_report
-
         import json
+
+        from tokamak_transport_lab.evaluation.benchmarks import save_report
 
         report = {"max_rel_error": 0.01, "rmse": 0.5}
         out = tmp_path / "report.json"
