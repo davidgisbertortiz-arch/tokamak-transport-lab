@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+
 from tokamak_transport_lab.solver.multichannel import (
     _exchange_step,
     solve_two_channel,

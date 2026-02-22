@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+
 from tokamak_transport_lab.integration.multichannel_picard import (
     MultichannelResult,
     equilibration_source,

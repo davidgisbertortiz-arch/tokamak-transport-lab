@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+
 from tokamak_transport_lab.transport.ion_transport import (
     ScaledQeTransport,
     chi_total_ion,
