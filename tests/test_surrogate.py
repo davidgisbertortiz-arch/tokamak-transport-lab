@@ -51,9 +51,7 @@ class TestTransportMLP:
 
         with torch.no_grad():
             y_after = loaded(x)
-        np.testing.assert_allclose(
-            y_before.numpy(), y_after.numpy(), atol=1e-6
-        )
+        np.testing.assert_allclose(y_before.numpy(), y_after.numpy(), atol=1e-6)
 
     def test_single_sample(self, model: TransportMLP) -> None:
         """Works with batch size 1."""

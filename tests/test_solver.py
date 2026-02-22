@@ -23,9 +23,7 @@ class TestBoundaryConditions:
     def test_dirichlet_at_pedestal(self, default_solver_kwargs: dict) -> None:
         """T at ρ=1 must equal T_ped exactly."""
         result = solve(**default_solver_kwargs)
-        assert result["Te"][-1] == pytest.approx(
-            default_solver_kwargs["t_ped"], abs=1e-12
-        )
+        assert result["Te"][-1] == pytest.approx(default_solver_kwargs["t_ped"], abs=1e-12)
 
     def test_symmetry_at_origin(self, default_solver_kwargs: dict) -> None:
         """dT/dρ at ρ=0 should be ≈ 0 (ghost-point approach)."""
