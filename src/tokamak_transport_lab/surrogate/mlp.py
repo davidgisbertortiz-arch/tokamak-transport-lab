@@ -65,7 +65,7 @@ class TransportMLP(nn.Module):
         torch.save(self.state_dict(), path)
 
     @classmethod
-    def load(cls, path: str | Path, **kwargs: object) -> "TransportMLP":
+    def load(cls, path: str | Path, **kwargs: object) -> TransportMLP:
         """Instantiate model and load state dict from *path*."""
         model = cls(**kwargs)  # type: ignore[arg-type]
         model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))
