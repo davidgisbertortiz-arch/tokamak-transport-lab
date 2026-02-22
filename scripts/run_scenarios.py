@@ -11,7 +11,7 @@ Produces (under ``<output_dir>/``)
 - ``<scenario>/result.npz``     — per-scenario rho, Te, Ti, chi_e, chi_i, …
 - ``<scenario>/metrics.json``   — convergence metadata + profile stats
 - ``summary.json``              — comparison table for all scenarios
-- ``comparison_profiles.png``   — Te + Ti profiles side-by-side
+- ``scenarios_compare.png``     — Te + Ti profiles side-by-side
 - ``comparison_convergence.png``— residual histories overlaid
 """
 
@@ -67,9 +67,7 @@ def _transport_params(cfg: dict, section: str) -> dict[str, float]:
     tcfg = cfg.get(section, cfg.get("transport", {}))
     return {
         "chi_s": tcfg.get("chi_s", _TRANSPORT_DEFAULTS["chi_s"]),
-        "a_over_LTe_crit": tcfg.get(
-            "a_over_LTe_crit", _TRANSPORT_DEFAULTS["a_over_LTe_crit"]
-        ),
+        "a_over_LTe_crit": tcfg.get("a_over_LTe_crit", _TRANSPORT_DEFAULTS["a_over_LTe_crit"]),
         "alpha_s": tcfg.get("alpha_s", _TRANSPORT_DEFAULTS["alpha_s"]),
         "chi_neo": tcfg.get("chi_neo", _TRANSPORT_DEFAULTS["chi_neo"]),
     }
@@ -281,10 +279,10 @@ def main() -> None:
         summary[name] = {
             "converged": m["converged"],
             "n_iters": m["n_iters"],
-            "wall_time_s": round(m["wall_time_s"], 3),
             "final_residual": m["final_residual"],
-            "Te_core_eV": round(float(result.te_final[0]), 1),
-            "Ti_core_eV": round(float(result.ti_final[0]), 1),
+            "runtime_s": round(m["wall_time_s"], 3),
+            "Te0": round(float(result.te_final[0]), 1),
+            "Ti0": round(float(result.ti_final[0]), 1),
             "Te_ped_eV": round(float(result.te_final[-1]), 1),
             "Ti_ped_eV": round(float(result.ti_final[-1]), 1),
         }
@@ -294,8 +292,8 @@ def main() -> None:
     summary_path.write_text(json.dumps(summary, indent=2) + "\n")
     print(f"\nSummary → {summary_path}")
 
-    _plot_comparison_profiles(results, out_base / "comparison_profiles.png")
-    print(f"Profiles plot → {out_base / 'comparison_profiles.png'}")
+    _plot_comparison_profiles(results, out_base / "scenarios_compare.png")
+    print(f"Profiles plot → {out_base / 'scenarios_compare.png'}")
 
     _plot_comparison_convergence(results, out_base / "comparison_convergence.png")
     print(f"Convergence plot → {out_base / 'comparison_convergence.png'}")
