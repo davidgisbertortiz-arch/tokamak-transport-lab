@@ -170,14 +170,25 @@ def main() -> None:
     sweep_enabled = st.sidebar.checkbox("Enable parameter sweep")
     sweep_param = "P_heat"
     sweep_values: list[float] = []
+    sweep_show_ti = False
     if sweep_enabled:
         sweep_param = st.sidebar.selectbox(
             "Sweep parameter",
             ["P_heat", "Te pedestal", "Ti pedestal", "Density", "τ_eq", "ρ_dep"],
         )
-        sweep_start = st.sidebar.number_input("Start", value=0.5)
-        sweep_end = st.sidebar.number_input("End", value=5.0)
-        sweep_steps = st.sidebar.slider("Steps", 3, 10, 5)
+        _defaults: dict[str, tuple[float, float]] = {
+            "P_heat": (0.5, 5.0),
+            "Te pedestal": (200.0, 2000.0),
+            "Ti pedestal": (200.0, 1500.0),
+            "Density": (0.5, 4.0),
+            "τ_eq": (0.002, 0.05),
+            "ρ_dep": (0.05, 0.6),
+        }
+        _lo, _hi = _defaults.get(sweep_param, (0.5, 5.0))
+        sweep_start = st.sidebar.number_input("Start", value=_lo, format="%.3f")
+        sweep_end = st.sidebar.number_input("End", value=_hi, format="%.3f")
+        sweep_steps = st.sidebar.slider("N steps", 3, 20, 8)
+        sweep_show_ti = st.sidebar.checkbox("Show Ti(ρ) overlay", value=True)
         sweep_values = list(np.linspace(sweep_start, sweep_end, sweep_steps))
 
     # ── helpers ──────────────────────────────────────────────────
@@ -448,10 +459,23 @@ def main() -> None:
     # ── sweep mode ───────────────────────────────────────────────
     else:
         st.subheader(f"🔄 Sweep: {sweep_param}")
+        st.caption(
+            f"{len(sweep_values)} points from **{sweep_values[0]:.3f}** "
+            f"to **{sweep_values[-1]:.3f}**"
+        )
 
         if st.button("▶ Run sweep", type="primary", use_container_width=True):
-            progress = st.progress(0)
-            results: list[tuple[float, MultichannelResult]] = []
+            progress = st.progress(0, text="Starting sweep…")
+            sweep_data: list[tuple[float, MultichannelResult, float]] = []
+
+            _param_map = {
+                "P_heat": "s0",
+                "Te pedestal": "te_p",
+                "Ti pedestal": "ti_p",
+                "Density": "dens",
+                "τ_eq": "teq",
+                "ρ_dep": "rdep",
+            }
 
             for i, val in enumerate(sweep_values):
                 kw: dict[str, float] = {
@@ -462,59 +486,76 @@ def main() -> None:
                     "dens": density,
                     "teq": tau_eq,
                 }
-                param_map = {
-                    "P_heat": "s0",
-                    "Te pedestal": "te_p",
-                    "Ti pedestal": "ti_p",
-                    "Density": "dens",
-                    "τ_eq": "teq",
-                    "ρ_dep": "rdep",
-                }
-                kw[param_map[sweep_param]] = val
+                kw[_param_map[sweep_param]] = val
 
-                res = _run_picard(**kw)
-                results.append((val, res))
-                progress.progress((i + 1) / len(sweep_values))
+                cfg_h = _config_hash(
+                    **kw,
+                    geom=geometry,
+                    kappa=kappa,
+                    delta=delta,
+                    chi_s=chi_s,
+                    a_crit=a_over_lt_crit,
+                    chi_neo=chi_neo_val,
+                    n_rho=n_rho,
+                    max_iters=max_iters,
+                    tol=tol,
+                )
+                t0 = time.perf_counter()
+                res = _cached_run(cfg_h, **kw)
+                dt_s = time.perf_counter() - t0
 
-            st.session_state["sweep_results"] = results
+                sweep_data.append((val, res, dt_s))
+                progress.progress(
+                    (i + 1) / len(sweep_values),
+                    text=f"Point {i + 1}/{len(sweep_values)}  "
+                    f"({sweep_param}={val:.3f}) — {dt_s:.2f} s",
+                )
 
-        if "sweep_results" in st.session_state:
-            results = st.session_state["sweep_results"]
+            st.session_state["sweep_data"] = sweep_data
 
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
-            for val, res in results:
+        if "sweep_data" in st.session_state:
+            sweep_data = st.session_state["sweep_data"]
+
+            # ── overlay plots ────────────────────────────────────
+            n_cols = 2 if sweep_show_ti else 1
+            fig, axes = plt.subplots(1, n_cols, figsize=(6 * n_cols, 4.5), squeeze=False)
+            ax_te = axes[0, 0]
+            for val, res, _ in sweep_data:
                 label = f"{sweep_param}={val:.2f}"
-                ax1.plot(res.rho, res.te_final, lw=1.4, label=label)
-                ax2.plot(res.rho, res.ti_final, lw=1.4, label=label)
+                ax_te.plot(res.rho, res.te_final, lw=1.4, label=label)
+            ax_te.set_xlabel("ρ")
+            ax_te.set_ylabel("Te [eV]")
+            ax_te.set_title("Electron temperature — sweep overlay")
+            ax_te.legend(fontsize=8)
+            ax_te.grid(True, alpha=0.3)
 
-            ax1.set_xlabel("ρ")
-            ax1.set_ylabel("Te [eV]")
-            ax1.set_title("Electron temperature")
-            ax1.legend(fontsize=8)
-            ax1.grid(True, alpha=0.3)
-
-            ax2.set_xlabel("ρ")
-            ax2.set_ylabel("Ti [eV]")
-            ax2.set_title("Ion temperature")
-            ax2.legend(fontsize=8)
-            ax2.grid(True, alpha=0.3)
+            if sweep_show_ti:
+                ax_ti = axes[0, 1]
+                for val, res, _ in sweep_data:
+                    label = f"{sweep_param}={val:.2f}"
+                    ax_ti.plot(res.rho, res.ti_final, lw=1.4, label=label)
+                ax_ti.set_xlabel("ρ")
+                ax_ti.set_ylabel("Ti [eV]")
+                ax_ti.set_title("Ion temperature — sweep overlay")
+                ax_ti.legend(fontsize=8)
+                ax_ti.grid(True, alpha=0.3)
 
             fig.tight_layout()
             st.pyplot(fig)
             plt.close(fig)
 
-            # summary table
+            # ── summary table ────────────────────────────────────
             import pandas as pd
 
             rows = []
-            for val, res in results:
+            for val, res, dt_s in sweep_data:
                 rows.append(
                     {
                         sweep_param: round(val, 3),
                         "Te(0) [eV]": round(float(res.te_final[0]), 1),
                         "Ti(0) [eV]": round(float(res.ti_final[0]), 1),
-                        "Iters": res.metadata["n_iters"],
-                        "Converged": res.metadata["converged"],
+                        "n_iters": res.metadata["n_iters"],
+                        "runtime_s": round(dt_s, 3),
                     }
                 )
             st.dataframe(pd.DataFrame(rows), use_container_width=True)
