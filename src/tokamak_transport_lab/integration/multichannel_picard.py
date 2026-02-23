@@ -237,9 +237,7 @@ def run_picard_multichannel(
             )
         except Exception:
             logger.warning("Iter %d: electron transport raised — fallback.", iteration)
-            chi_e_new = np.asarray(
-                fallback_model(a_over_lte, **fallback_params), dtype=np.float64
-            )
+            chi_e_new = np.asarray(fallback_model(a_over_lte, **fallback_params), dtype=np.float64)
             used_fallback = True
 
         try:
@@ -249,23 +247,17 @@ def run_picard_multichannel(
             )
         except Exception:
             logger.warning("Iter %d: ion transport raised — fallback.", iteration)
-            chi_i_new = np.asarray(
-                fallback_model(a_over_lti, **fallback_params), dtype=np.float64
-            )
+            chi_i_new = np.asarray(fallback_model(a_over_lti, **fallback_params), dtype=np.float64)
             used_fallback = True
 
         # 3. NaN/Inf guard
         if has_nonfinite(chi_e_new):
             logger.warning("Iter %d: chi_e NaN/Inf — fallback.", iteration)
-            chi_e_new = np.asarray(
-                fallback_model(a_over_lte, **fallback_params), dtype=np.float64
-            )
+            chi_e_new = np.asarray(fallback_model(a_over_lte, **fallback_params), dtype=np.float64)
             used_fallback = True
         if has_nonfinite(chi_i_new):
             logger.warning("Iter %d: chi_i NaN/Inf — fallback.", iteration)
-            chi_i_new = np.asarray(
-                fallback_model(a_over_lti, **fallback_params), dtype=np.float64
-            )
+            chi_i_new = np.asarray(fallback_model(a_over_lti, **fallback_params), dtype=np.float64)
             used_fallback = True
 
         chi_e = np.maximum(chi_e_new, 1e-6)
@@ -276,15 +268,11 @@ def run_picard_multichannel(
 
         # 5. Solve electron channel: Se − S_ei (electrons lose energy)
         source_e_eff = source_e - s_ei
-        te_new = _solver_step(
-            te, rho, chi_e, vp, source_e_eff, te_ped, dt, theta, sub_steps
-        )
+        te_new = _solver_step(te, rho, chi_e, vp, source_e_eff, te_ped, dt, theta, sub_steps)
 
         # 6. Solve ion channel: Si + S_ei (ions gain energy)
         source_i_eff = source_i + s_ei
-        ti_new = _solver_step(
-            ti, rho, chi_i, vp, source_i_eff, ti_ped, dt, theta, sub_steps
-        )
+        ti_new = _solver_step(ti, rho, chi_i, vp, source_i_eff, ti_ped, dt, theta, sub_steps)
 
         # Floor: temperatures must remain positive (min 10 eV)
         te_new = np.maximum(te_new, 10.0)
@@ -360,9 +348,7 @@ def run_picard_multichannel(
             "converged": converged,
             "used_fallback": used_fallback,
             "wall_time_s": wall_time,
-            "final_residual": (
-                residual_history[-1] if residual_history else float("nan")
-            ),
+            "final_residual": (residual_history[-1] if residual_history else float("nan")),
             "te_core_eV": float(te[0]),
             "ti_core_eV": float(ti[0]),
         },

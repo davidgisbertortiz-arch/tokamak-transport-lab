@@ -243,9 +243,9 @@ def main() -> None:
 
     for yaml_path in yaml_files:
         name = yaml_path.stem
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Running scenario: {name}  ({yaml_path})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         with open(yaml_path) as f:
             cfg = yaml.safe_load(f)
