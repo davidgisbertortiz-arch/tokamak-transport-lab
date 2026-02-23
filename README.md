@@ -6,6 +6,28 @@
 
 > Interactive integrated modelling playground: 1-D diffusion solver, ML transport surrogate, calibrated uncertainty — all on synthetic data, runnable on a laptop.
 
+<p align="center">
+  <img src="assets/demo.gif" alt="P_heat sweep demo" width="600">
+</p>
+
+## Quick Demo
+
+```bash
+git clone https://github.com/davidgisbertortiz-arch/tokamak-transport-lab.git
+cd tokamak-transport-lab
+pip install -e ".[dev,demo,gif]"
+
+# Interactive app (opens in browser)
+streamlit run src/tokamak_transport_lab/app/demo.py
+
+# Headless GIF for README
+python -m scripts.make_readme_gif --config configs/scenarios/mid_power.yaml --n_frames 10
+```
+
+The Streamlit app includes a **sweep mode** — vary P_heat (or any parameter)
+across N steps and overlay all Te(ρ)/Ti(ρ) curves with a summary table.
+Outputs go to `outputs/` (git-ignored).
+
 ## Overview
 
 **tokamak-transport-lab** couples a custom 1-D Crank–Nicolson diffusion solver with a deep-ensemble ML surrogate of turbulent transport in a self-consistent Picard iteration loop, producing predictive plasma temperature profiles with calibrated uncertainty.  The solver supports **coupled electron–ion** ($T_e$–$T_i$) channels with collisional equilibration.
@@ -224,26 +246,36 @@ circular $V'=\rho$.  Set `kappa` and `delta` in your config or call
 Launch the interactive app (requires `[demo]` extra):
 
 ```bash
+pip install -e ".[demo]"
 streamlit run src/tokamak_transport_lab/app/demo.py
 ```
 
+<!-- Optional: replace with a real screenshot when available -->
+<!-- ![Streamlit screenshot](assets/screenshot.png) -->
+
 The app provides:
-- **Sidebar sliders** for heating power, pedestal temperatures, density, geometry, transport knobs.
-- **Live profile plots** — Te(ρ) and Ti(ρ) update instantly.
-- **Convergence trace** — residual vs. Picard iteration.
-- **Sweep mode** — vary one parameter across a range and overlay all profiles.
+- **Sidebar** — P_heat, ρ_dep, Te/Ti pedestal, density, τ_eq, geometry (circular/Miller), transport model (analytic/MLP/ensemble), UQ toggle, solver knobs.
+- **Run button** — triggers Picard loop; results are cached by config hash.
+- **Three-panel layout** (tabs):
+  - 📊 **Temperature profiles** — Te(ρ) + Ti(ρ), optional 90 % UQ band (ensemble + conformal).
+  - 📉 **Convergence** — residual (log) + relaxation α on dual y-axes.
+  - 🔧 **χ profiles** — χ_turb + χ_neo decomposition for electron and ion channels.
+- **Sweep mode** — sweep P_heat (or any parameter) across N steps (default 8), overlay Te/Ti curves, summary table with `Te(0)`, `Ti(0)`, `n_iters`, `runtime_s`.
+- **Metrics row** — Te(0), Ti(0), Picard iters, converged, runtime.
 
 ### Headless GIF Generation
 
 Generate an animated demo GIF for the README without Streamlit (requires `[gif]` extra):
 
 ```bash
-python -m scripts.make_readme_gif                          # default: sweep S0_e 0.5→6
-python -m scripts.make_readme_gif --param te_ped --frames 12
+pip install -e ".[gif]"
+python -m scripts.make_readme_gif --config configs/scenarios/mid_power.yaml --n_frames 10
+python -m scripts.make_readme_gif --param S0_e --start 0.5 --end 6 --n_frames 12
 python -m scripts.make_readme_gif --out assets/demo.gif
 ```
 
-Outputs a looping GIF showing Te/Ti profiles morphing as a physics parameter sweeps.
+Outputs `assets/demo.gif` — a looping animation of Te/Ti profiles with a text
+overlay (P_heat, residual, n_iters) as the swept parameter varies. Target < 5 MB.
 
 Run the tests:
 
