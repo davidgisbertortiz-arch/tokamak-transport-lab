@@ -18,7 +18,6 @@ from tokamak_transport_lab.transport.ion_transport import (
 )
 from tokamak_transport_lab.transport.stiffness import chi_total
 
-
 # ── ScaledQeTransport ────────────────────────────────────────────
 
 
@@ -72,9 +71,7 @@ class TestScaledQeTransport:
 
     def test_always_positive(self) -> None:
         """chi_i should always be > 0 (neoclassical floor)."""
-        model = ScaledQeTransport(
-            chi_total, electron_params={"chi_neo": 0.01}, qi_factor=0.5
-        )
+        model = ScaledQeTransport(chi_total, electron_params={"chi_neo": 0.01}, qi_factor=0.5)
         a = np.array([0.0, 1.0, 2.0])  # all below threshold
         chi_i = model(a)
         assert (chi_i > 0).all()

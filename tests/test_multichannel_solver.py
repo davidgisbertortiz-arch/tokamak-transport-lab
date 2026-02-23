@@ -21,7 +21,6 @@ from tokamak_transport_lab.solver.multichannel import (
     solve_two_channel,
 )
 
-
 # ── exchange step ────────────────────────────────────────────────
 
 
@@ -78,8 +77,16 @@ class TestSolveTwoChannel:
     def test_output_keys(self) -> None:
         """Output dict has all required keys."""
         out = solve_two_channel(n_rho=20, n_steps=10)
-        for key in ["rho", "Te", "Ti", "chi_e", "chi_i", "source_e", "source_i",
-                     "residual_history"]:
+        for key in [
+            "rho",
+            "Te",
+            "Ti",
+            "chi_e",
+            "chi_i",
+            "source_e",
+            "source_i",
+            "residual_history",
+        ]:
             assert key in out, f"Missing key: {key}"
 
     def test_output_shapes(self) -> None:
@@ -97,9 +104,7 @@ class TestSolveTwoChannel:
     def test_dirichlet_bcs(self) -> None:
         """Pedestal BCs are enforced at ρ = 1."""
         te_ped, ti_ped = 500.0, 350.0
-        out = solve_two_channel(
-            n_rho=30, te_ped=te_ped, ti_ped=ti_ped, n_steps=100
-        )
+        out = solve_two_channel(n_rho=30, te_ped=te_ped, ti_ped=ti_ped, n_steps=100)
         assert out["Te"][-1] == pytest.approx(te_ped, abs=0.1)
         assert out["Ti"][-1] == pytest.approx(ti_ped, abs=0.1)
 
@@ -128,9 +133,7 @@ class TestSolveTwoChannel:
 
     def test_residual_decreases_overall(self) -> None:
         """Residual should generally decrease toward steady state."""
-        out = solve_two_channel(
-            n_rho=40, chi_e=1.0, chi_i=0.5, n_steps=2000, dt=1e-4
-        )
+        out = solve_two_channel(n_rho=40, chi_e=1.0, chi_i=0.5, n_steps=2000, dt=1e-4)
         hist = out["residual_history"]
         assert len(hist) == 2000
         # Compare first quarter vs last quarter
@@ -141,9 +144,7 @@ class TestSolveTwoChannel:
         """Accepts pre-computed source arrays."""
         n = 30
         src = np.ones(n) * 0.5
-        out = solve_two_channel(
-            n_rho=n, source_e=src, source_i=src * 0.3, n_steps=50
-        )
+        out = solve_two_channel(n_rho=n, source_e=src, source_i=src * 0.3, n_steps=50)
         np.testing.assert_array_equal(out["source_e"], src)
         np.testing.assert_allclose(out["source_i"], src * 0.3)
 
@@ -161,9 +162,7 @@ class TestSolveTwoChannel:
         n = 30
         te0 = np.linspace(2000.0, 500.0, n)
         ti0 = np.linspace(1500.0, 400.0, n)
-        out = solve_two_channel(
-            n_rho=n, te_init=te0, ti_init=ti0, n_steps=50
-        )
+        out = solve_two_channel(n_rho=n, te_init=te0, ti_init=ti0, n_steps=50)
         assert out["Te"].shape == (n,)
         assert out["Ti"].shape == (n,)
 
@@ -191,7 +190,9 @@ class TestSolveTwoChannel:
         )
         # Te from two-channel should match single-channel within ~1%
         np.testing.assert_allclose(
-            two_ch["Te"], single["Te"], rtol=0.01,
+            two_ch["Te"],
+            single["Te"],
+            rtol=0.01,
             err_msg="Two-channel Te differs from single-channel beyond 1%",
         )
 
@@ -201,8 +202,6 @@ class TestSolveTwoChannel:
         rho = np.linspace(0.0, 1.0, n)
         chi_e = 0.5 + rho  # increasing outward
         chi_i = np.full(n, 0.3)
-        out = solve_two_channel(
-            n_rho=n, chi_e=chi_e, chi_i=chi_i, n_steps=200
-        )
+        out = solve_two_channel(n_rho=n, chi_e=chi_e, chi_i=chi_i, n_steps=200)
         assert np.isfinite(out["Te"]).all()
         assert np.isfinite(out["Ti"]).all()

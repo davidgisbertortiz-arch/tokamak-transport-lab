@@ -23,7 +23,6 @@ from tokamak_transport_lab.integration.multichannel_picard import (
 )
 from tokamak_transport_lab.transport.stiffness import chi_total
 
-
 # ── equilibration source ─────────────────────────────────────────
 
 
@@ -355,18 +354,18 @@ class TestExchangeSignNoDiffusion:
             n_rho=n,
             te_ped=1000.0,
             ti_ped=400.0,
-            s0_e=0.0,           # no external heating
+            s0_e=0.0,  # no external heating
             s0_i=0.0,
             density=2.0,
-            tau_eq=0.005,       # strong coupling
+            tau_eq=0.005,  # strong coupling
             transport_model_e=self._flat_chi,
             transport_model_i=self._flat_chi,
             dt=1e-3,
             theta=0.5,
             sub_steps=50,
-            max_iters=1,        # single iteration
+            max_iters=1,  # single iteration
             tol=1e-12,
-            alpha0=1.0,         # no under-relaxation
+            alpha0=1.0,  # no under-relaxation
             te_init=te_init,
             ti_init=ti_init,
         )
@@ -412,9 +411,7 @@ class TestExchangeSignNoDiffusion:
         delta_ti = result.ti_final[1:-1] - ti_init[1:-1]
 
         # Opposite signs everywhere interior
-        assert (delta_te * delta_ti < 0).all(), (
-            "Delta(Te) and Delta(Ti) must have opposite signs"
-        )
+        assert (delta_te * delta_ti < 0).all(), "Delta(Te) and Delta(Ti) must have opposite signs"
 
 
 # ── end-to-end sanity (tiny grid, fast) ──────────────────────────
@@ -461,10 +458,10 @@ class TestEndToEndSanity:
             n_rho=n,
             te_ped=600.0,
             ti_ped=ti_ped,
-            s0_e=2.0,           # strong electron heating
+            s0_e=2.0,  # strong electron heating
             s0_i=0.0,
             density=1.0,
-            tau_eq=0.005,       # strong coupling
+            tau_eq=0.005,  # strong coupling
             transport_model_e=chi_total,
             transport_params_e={"chi_s": 1.0, "chi_neo": 0.5},
             transport_model_i=chi_total,
@@ -479,6 +476,5 @@ class TestEndToEndSanity:
 
         mean_ti_final = float(result.ti_final.mean())
         assert mean_ti_final > mean_ti_init, (
-            f"mean(Ti) should increase: init={mean_ti_init:.1f} → "
-            f"final={mean_ti_final:.1f}"
+            f"mean(Ti) should increase: init={mean_ti_init:.1f} → final={mean_ti_final:.1f}"
         )
