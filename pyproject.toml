@@ -35,11 +35,14 @@ dev = [
 surrogate = [
     "torch>=2.1,<2.6",
 ]
-app = [
+demo = [
     "streamlit>=1.30,<2.0",
 ]
+gif = [
+    "imageio>=2.30,<3.0",
+]
 all = [
-    "tokamak-transport-lab[dev,surrogate,app]",
+    "tokamak-transport-lab[dev,surrogate,demo,gif]",
 ]
 
 [tool.setuptools.packages.find]

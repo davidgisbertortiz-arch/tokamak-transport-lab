@@ -67,7 +67,10 @@ dimensionless local parameters $(a/L_{T_e},\, q,\, \hat{s},\, \nu^*,\, \chi_s,\,
 ```bash
 git clone https://github.com/davidgisbertortiz-arch/tokamak-transport-lab.git
 cd tokamak-transport-lab
-pip install -e ".[dev]"
+pip install -e ".[dev]"          # core + lint + tests
+pip install -e ".[demo]"         # adds Streamlit interactive app
+pip install -e ".[gif]"          # adds imageio for headless GIF generation
+pip install -e ".[dev,demo,gif]" # everything at once
 ```
 
 ## Quick Start
@@ -216,6 +219,32 @@ circular $V'=\rho$.  Set `kappa` and `delta` in your config or call
 > coverage guarantees.  The Miller model is a lowest-order analytic
 > approximation — not a full Grad–Shafranov solution.
 
+### Streamlit Interactive Demo
+
+Launch the interactive app (requires `[demo]` extra):
+
+```bash
+streamlit run src/tokamak_transport_lab/app/demo.py
+```
+
+The app provides:
+- **Sidebar sliders** for heating power, pedestal temperatures, density, geometry, transport knobs.
+- **Live profile plots** — Te(ρ) and Ti(ρ) update instantly.
+- **Convergence trace** — residual vs. Picard iteration.
+- **Sweep mode** — vary one parameter across a range and overlay all profiles.
+
+### Headless GIF Generation
+
+Generate an animated demo GIF for the README without Streamlit (requires `[gif]` extra):
+
+```bash
+python -m scripts.make_readme_gif                          # default: sweep S0_e 0.5→6
+python -m scripts.make_readme_gif --param te_ped --frames 12
+python -m scripts.make_readme_gif --out assets/demo.gif
+```
+
+Outputs a looping GIF showing Te/Ti profiles morphing as a physics parameter sweeps.
+
 Run the tests:
 
 ```bash
@@ -241,6 +270,7 @@ tokamak-transport-lab/
 │   ├── surrogate/           # MLP, ensemble, UQ (weeks 3-4)
 │   ├── data/                # Dataset generation (week 2)
 │   ├── integration/         # Picard loop (week 5)
+│   ├── app/                 # Streamlit demo + headless GIF export
 │   ├── evaluation/          # Metrics, benchmarks
 │   └── visualization/       # Plotting helpers
 ├── scripts/                 # Runnable entry points
@@ -261,7 +291,7 @@ tokamak-transport-lab/
 | 6  | Ensemble UQ + conformal + Miller geometry | ✅ |
 | 7  | Picard loop + safeguards + convergence + CLI | ✅ |
 | 8  | Multi-channel Te–Ti + scenario configs + runner | ✅ |
-| 9+ | Visuals, Streamlit | 🔜 |
+| 9  | Streamlit demo + sweep + headless GIF + README polish | ✅ |
 
 ## License
 
