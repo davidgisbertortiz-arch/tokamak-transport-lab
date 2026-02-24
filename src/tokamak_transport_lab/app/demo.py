@@ -177,7 +177,7 @@ def main() -> None:
             ["P_heat", "Te pedestal", "Ti pedestal", "Density", "τ_eq", "ρ_dep"],
         )
         _defaults: dict[str, tuple[float, float]] = {
-            "P_heat": (0.5, 5.0),
+            "P_heat": (0.2, 12.0),
             "Te pedestal": (200.0, 2000.0),
             "Ti pedestal": (200.0, 1500.0),
             "Density": (0.5, 4.0),
@@ -515,6 +515,23 @@ def main() -> None:
 
         if "sweep_data" in st.session_state:
             sweep_data = st.session_state["sweep_data"]
+
+            # ── Te0 / Ti0 vs swept parameter ─────────────────────
+            sweep_vals = [v for v, _, _ in sweep_data]
+            sweep_te0s = [float(r.te_final[0]) for _, r, _ in sweep_data]
+            sweep_ti0s = [float(r.ti_final[0]) for _, r, _ in sweep_data]
+
+            fig_trend, ax_trend = plt.subplots(figsize=(7, 3.5))
+            ax_trend.plot(sweep_vals, sweep_te0s, "C0-o", lw=1.8, markersize=5, label="Te(0)")
+            ax_trend.plot(sweep_vals, sweep_ti0s, "C3--s", lw=1.4, markersize=4, label="Ti(0)")
+            ax_trend.set_xlabel(sweep_param)
+            ax_trend.set_ylabel("Core temperature [eV]")
+            ax_trend.set_title("Core temperature response")
+            ax_trend.legend()
+            ax_trend.grid(True, alpha=0.3)
+            fig_trend.tight_layout()
+            st.pyplot(fig_trend)
+            plt.close(fig_trend)
 
             # ── overlay plots ────────────────────────────────────
             n_cols = 2 if sweep_show_ti else 1

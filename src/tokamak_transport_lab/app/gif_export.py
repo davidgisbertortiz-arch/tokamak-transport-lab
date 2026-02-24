@@ -3,15 +3,18 @@
 Generates animated frames showing Te/Ti profiles as a parameter sweeps,
 then stitches them into a GIF using ``imageio`` (requires ``pip install -e '.[gif]'``).
 
-Each frame includes a text overlay with the swept parameter value,
-final residual, and Picard iteration count.
+Each frame is a **two-panel** figure:
+
+* **Left** — Te(ρ) and Ti(ρ) profiles with a text overlay
+  (swept param, Te0, final_residual, n_iters, converged).
+* **Right** — Te0 vs swept parameter curve with a moving marker
+  showing the current frame's position.
 
 Usage::
 
     python -m scripts.make_readme_gif
-    python -m scripts.make_readme_gif --config configs/scenarios/mid_power.yaml --n_frames 10
-    python -m scripts.make_readme_gif --param S0_e --start 0.5 --end 8 --n_frames 12
-    python -m scripts.make_readme_gif --out assets/demo.gif
+    python -m scripts.make_readme_gif --config configs/scenarios/mid_power.yaml --n_frames 12
+    python -m scripts.make_readme_gif --param S0_e --start 0.2 --end 12 --n_frames 12
 """
 
 from __future__ import annotations
@@ -44,8 +47,8 @@ _TRANSPORT_PARAMS: dict[str, float] = {
 def _run_for_gif(
     *,
     s0_e: float = 1.0,
-    te_ped: float = 500.0,
-    ti_ped: float = 400.0,
+    te_ped: float = 250.0,
+    ti_ped: float = 200.0,
     density: float = 1.0,
     tau_eq: float = 0.01,
     chi_s: float | None = None,
@@ -53,13 +56,13 @@ def _run_for_gif(
     alpha_s: float | None = None,
     chi_neo: float | None = None,
     n_rho: int = 50,
-    max_iters: int = 40,
-    tol: float = 1e-3,
+    max_iters: int = 50,
+    tol: float = 1e-4,
 ) -> MultichannelResult:
     """Lightweight run for GIF frames.
 
-    Supports overriding transport parameters and solver settings
-    when driven from a YAML scenario config.
+    Defaults are tuned so low-to-high P_heat sweeps produce visually
+    distinct profiles with varying convergence behaviour.
     """
     params_e = {
         "chi_s": chi_s if chi_s is not None else _TRANSPORT_PARAMS["chi_s"],
@@ -94,7 +97,7 @@ def _run_for_gif(
 
 # ── frame rendering ─────────────────────────────────────────────
 
-_GIF_DPI = 90  # balance quality / file size (<5 MB)
+_GIF_DPI = 130  # sharp enough for README embed
 
 
 def render_frame(
@@ -103,49 +106,83 @@ def render_frame(
     param_name: str = "S0_e",
     param_value: float = 1.0,
     te_ylim: tuple[float, float] | None = None,
+    sweep_values: np.ndarray | None = None,
+    sweep_te0s: np.ndarray | None = None,
+    current_idx: int = 0,
 ) -> np.ndarray:
-    """Render a single matplotlib frame and return as RGB uint8 array.
+    """Render a two-panel frame and return as RGB uint8 array.
 
-    The frame shows Te(ρ) and Ti(ρ) profiles with a text overlay
-    containing the swept parameter value, final residual, and
-    iteration count.
+    Left panel: Te(ρ) + Ti(ρ) profiles with metadata overlay.
+    Right panel: Te0 vs swept parameter with moving marker.
     """
-    fig, ax = plt.subplots(figsize=(7, 4.2), dpi=_GIF_DPI)
+    fig, (ax_prof, ax_trend) = plt.subplots(
+        1,
+        2,
+        figsize=(10, 4.2),
+        dpi=_GIF_DPI,
+        gridspec_kw={"width_ratios": [3, 2]},
+    )
 
-    ax.plot(result.rho, result.te_final, "C0-", linewidth=2.2, label="Te")
-    ax.plot(result.rho, result.ti_final, "C3--", linewidth=2.2, label="Ti")
-    ax.set_xlabel("ρ")
-    ax.set_ylabel("Temperature [eV]")
-    ax.set_title("tokamak-transport-lab — P_heat sweep")
-    ax.legend(loc="upper right")
-    ax.grid(True, alpha=0.3)
+    # ── left panel: profiles ─────────────────────────────────────
+    ax_prof.plot(result.rho, result.te_final, "C0-", lw=2.2, label="Te")
+    ax_prof.plot(result.rho, result.ti_final, "C3--", lw=2.2, label="Ti")
+    ax_prof.set_xlabel("ρ")
+    ax_prof.set_ylabel("Temperature [eV]")
+    ax_prof.set_title("P_heat sweep — profiles")
+    ax_prof.legend(loc="upper right", fontsize=8)
+    ax_prof.grid(True, alpha=0.3)
     if te_ylim is not None:
-        ax.set_ylim(*te_ylim)
+        ax_prof.set_ylim(*te_ylim)
 
-    # ── text overlay ─────────────────────────────────────────────
+    # Text overlay
     n_iters = result.metadata.get("n_iters", len(result.residual_history))
     final_resid = result.residual_history[-1] if result.residual_history else float("nan")
+    converged = result.metadata.get("converged", False)
+    te0 = float(result.te_final[0])
     overlay = (
-        f"{param_name} = {param_value:.2f}\nresidual = {final_resid:.2e}\nn_iters = {n_iters}"
+        f"{param_name} = {param_value:.2f}\n"
+        f"Te0 = {te0:.0f} eV\n"
+        f"residual = {final_resid:.2e}\n"
+        f"n_iters = {n_iters}\n"
+        f"converged = {converged}"
     )
-    ax.text(
+    ax_prof.text(
         0.02,
         0.97,
         overlay,
-        transform=ax.transAxes,
-        fontsize=9,
+        transform=ax_prof.transAxes,
+        fontsize=7.5,
         verticalalignment="top",
         fontfamily="monospace",
-        bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.85},
+        bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.88},
     )
 
+    # ── right panel: Te0 vs swept param ──────────────────────────
+    if sweep_values is not None and sweep_te0s is not None:
+        ax_trend.plot(sweep_values, sweep_te0s, "C0-", lw=1.8, label="Te(0)")
+        ax_trend.plot(
+            sweep_values[current_idx],
+            sweep_te0s[current_idx],
+            "o",
+            color="C3",
+            markersize=9,
+            zorder=5,
+        )
+        ax_trend.set_xlabel(param_name)
+        ax_trend.set_ylabel("Te(0) [eV]")
+        ax_trend.set_title("Core temperature response")
+        ax_trend.grid(True, alpha=0.3)
+    else:
+        ax_trend.set_visible(False)
+
+    fig.suptitle("tokamak-transport-lab", fontsize=11, fontweight="bold", y=0.99)
     fig.tight_layout()
 
     # Rasterise to numpy RGB array (drop alpha → smaller GIF)
     fig.canvas.draw()
     buf = fig.canvas.buffer_rgba()
     rgba = np.asarray(buf, dtype=np.uint8)
-    rgb = rgba[:, :, :3].copy()  # drop alpha channel
+    rgb = rgba[:, :, :3].copy()
     plt.close(fig)
     return rgb
 
@@ -156,11 +193,11 @@ def render_frame(
 def generate_gif(
     *,
     param: str = "S0_e",
-    start: float = 0.5,
-    end: float = 6.0,
-    n_frames: int = 10,
+    start: float = 0.2,
+    end: float = 12.0,
+    n_frames: int = 12,
     out_path: str | pathlib.Path = "assets/demo.gif",
-    duration_s: float = 0.6,
+    duration_s: float = 0.45,
     base_kwargs: dict[str, Any] | None = None,
 ) -> pathlib.Path:
     """Run a parameter sweep headlessly and stitch frames into a GIF.
@@ -171,18 +208,16 @@ def generate_gif(
         Parameter to sweep.  One of ``S0_e``, ``te_ped``, ``ti_ped``,
         ``density``, ``tau_eq``.
     start, end : float
-        Sweep range.
+        Sweep range.  Default 0.2 → 12.0 for ``S0_e`` produces
+        clearly distinct profiles.
     n_frames : int
-        Number of frames in the GIF.
+        Number of frames in the GIF (default 12).
     out_path : str or Path
         Destination file.
     duration_s : float
-        Seconds per frame.
+        Seconds per frame (default 0.45).
     base_kwargs : dict, optional
         Override default run parameters (from YAML scenario config).
-        Keys may include ``s0_e``, ``te_ped``, ``ti_ped``, ``density``,
-        ``tau_eq``, ``chi_s``, ``a_over_LTe_crit``, ``alpha_s``,
-        ``chi_neo``, ``n_rho``, ``max_iters``, ``tol``.
 
     Returns
     -------
@@ -200,8 +235,8 @@ def generate_gif(
     # ── defaults (may be overridden by base_kwargs) ──────────────
     defaults: dict[str, Any] = {
         "s0_e": 1.0,
-        "te_ped": 500.0,
-        "ti_ped": 400.0,
+        "te_ped": 250.0,
+        "ti_ped": 200.0,
         "density": 1.0,
         "tau_eq": 0.01,
     }
@@ -218,27 +253,38 @@ def generate_gif(
     }
     run_key = _param_key.get(param, param)
 
-    # ── first pass: run all points, track y-limits ───────────────
+    # ── first pass: run all points, collect results ──────────────
     all_results: list[tuple[float, MultichannelResult]] = []
     te_max = 0.0
     for i, val in enumerate(values):
         kw = {**defaults, run_key: val}
         print(f"  frame {i + 1}/{n_frames}  {param}={val:.3f} …", end="", flush=True)
         res = _run_for_gif(**kw)
-        print(f"  iters={res.metadata.get('n_iters', '?')}")
+        meta = res.metadata
+        print(
+            f"  Te0={res.te_final[0]:.0f}  iters={meta.get('n_iters', '?')}"
+            f"  conv={meta.get('converged', '?')}"
+        )
         all_results.append((val, res))
         te_max = max(te_max, float(res.te_final.max()))
 
     te_ylim = (0.0, te_max * 1.15)
 
+    # Pre-compute Te0 array for the trend panel
+    sweep_vals = np.array([v for v, _ in all_results])
+    sweep_te0s = np.array([float(r.te_final[0]) for _, r in all_results])
+
     # ── second pass: render frames ───────────────────────────────
     frames: list[np.ndarray] = []
-    for val, res in all_results:
+    for idx, (val, res) in enumerate(all_results):
         frame = render_frame(
             res,
             param_name=param,
             param_value=val,
             te_ylim=te_ylim,
+            sweep_values=sweep_vals,
+            sweep_te0s=sweep_te0s,
+            current_idx=idx,
         )
         frames.append(frame)
 

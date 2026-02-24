@@ -34,9 +34,9 @@ def main() -> None:
         choices=["S0_e", "te_ped", "ti_ped", "density", "tau_eq"],
         help="Parameter to sweep (default: S0_e)",
     )
-    parser.add_argument("--start", type=float, default=0.5, help="Sweep start value")
-    parser.add_argument("--end", type=float, default=6.0, help="Sweep end value")
-    parser.add_argument("--n_frames", type=int, default=10, help="Number of GIF frames")
+    parser.add_argument("--start", type=float, default=0.2, help="Sweep start value")
+    parser.add_argument("--end", type=float, default=12.0, help="Sweep end value")
+    parser.add_argument("--n_frames", type=int, default=12, help="Number of GIF frames")
     parser.add_argument(
         "--out",
         type=str,
@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument(
         "--duration",
         type=float,
-        default=0.6,
+        default=0.45,
         help="Seconds per frame",
     )
     args = parser.parse_args()

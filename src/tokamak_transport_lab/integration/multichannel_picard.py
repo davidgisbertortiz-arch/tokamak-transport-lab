@@ -282,6 +282,10 @@ def run_picard_multichannel(
         te_mixed = np.asarray(mix_profiles(te, te_new, alpha), dtype=np.float64)
         ti_mixed = np.asarray(mix_profiles(ti, ti_new, alpha), dtype=np.float64)
 
+        # Hard-enforce Dirichlet BC (prevents edge kink from mixing)
+        te_mixed[-1] = te_ped
+        ti_mixed[-1] = ti_ped
+
         # 8. Combined residual = max of both channel residuals
         res_te = relative_l2_residual(te_mixed, te)
         res_ti = relative_l2_residual(ti_mixed, ti)
@@ -334,6 +338,10 @@ def run_picard_multichannel(
         ti = ti_mixed
 
     wall_time = time.perf_counter() - t_start
+
+    # Final BC enforcement before returning
+    te[-1] = te_ped
+    ti[-1] = ti_ped
 
     return MultichannelResult(
         rho=rho,

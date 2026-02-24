@@ -304,6 +304,10 @@ def run_picard(
         # 5. Under-relax
         te_mixed = mix_profiles(te, te_new, alpha)
 
+        # Hard-enforce Dirichlet BC (prevents edge kink from mixing)
+        te_mixed = np.asarray(te_mixed, dtype=np.float64)
+        te_mixed[-1] = t_ped
+
         # 6. Residual
         residual = relative_l2_residual(te_mixed, te)
 
@@ -354,6 +358,9 @@ def run_picard(
         te = np.asarray(te_mixed, dtype=np.float64)
 
     wall_time = time.perf_counter() - t_start
+
+    # Final BC enforcement before returning
+    te[-1] = t_ped
 
     return PicardResult(
         rho=rho,
