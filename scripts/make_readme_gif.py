@@ -59,26 +59,19 @@ def main() -> None:
         with open(args.config) as fh:
             cfg = yaml.safe_load(fh)
 
-        base_kwargs = {
-            "s0_e": cfg.get("source", {}).get("S0_e", 1.0),
-            "te_ped": cfg.get("bc", {}).get("Te_ped", 500.0),
-            "ti_ped": cfg.get("bc", {}).get("Ti_ped", 400.0),
-            "density": cfg.get("coupling", {}).get("density", 1.0),
-            "tau_eq": cfg.get("coupling", {}).get("tau_eq", 0.01),
-        }
-        # Also propagate transport/solver settings
-        transport_e = cfg.get("transport_e", {})
-        base_kwargs["chi_s"] = transport_e.get("chi_s", 1.0)
-        base_kwargs["a_over_LTe_crit"] = transport_e.get("a_over_LTe_crit", 3.0)
-        base_kwargs["alpha_s"] = transport_e.get("alpha_s", 1.5)
-        base_kwargs["chi_neo"] = transport_e.get("chi_neo", 0.01)
-
+        # Only inherit grid + picard settings from the scenario config.
+        # We do NOT inherit te_ped / transport params — those stay at
+        # GIF-friendly defaults (lower pedestal, softer stiffness) so
+        # the sweep produces visually distinct profiles.
         grid = cfg.get("grid", {})
-        base_kwargs["n_rho"] = grid.get("n_rho", 50)
+        n_rho = grid.get("n_rho", 50)
+        # Cap at 60 to keep each frame fast
+        base_kwargs["n_rho"] = min(int(n_rho), 60)
 
         picard = cfg.get("picard", {})
-        base_kwargs["max_iters"] = picard.get("max_iters", 40)
-        base_kwargs["tol"] = picard.get("tol", 1e-3)
+        base_kwargs["max_iters"] = picard.get("max_iters", 80)
+        # Use looser tol for GIF — convergence display is still real
+        base_kwargs["tol"] = max(float(picard.get("tol", 5e-4)), 5e-4)
 
     from tokamak_transport_lab.app.gif_export import generate_gif
 

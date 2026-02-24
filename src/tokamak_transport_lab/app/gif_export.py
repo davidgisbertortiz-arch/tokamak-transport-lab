@@ -33,9 +33,10 @@ from tokamak_transport_lab.transport.stiffness import chi_total
 
 # ── defaults ─────────────────────────────────────────────────────
 
+# Softer stiffness → profiles visibly respond to S0_e sweep
 _TRANSPORT_PARAMS: dict[str, float] = {
-    "chi_s": 1.0,
-    "a_over_LTe_crit": 3.0,
+    "chi_s": 0.4,
+    "a_over_LTe_crit": 2.0,
     "alpha_s": 1.5,
     "chi_neo": 0.01,
 }
@@ -56,8 +57,8 @@ def _run_for_gif(
     alpha_s: float | None = None,
     chi_neo: float | None = None,
     n_rho: int = 50,
-    max_iters: int = 50,
-    tol: float = 1e-4,
+    max_iters: int = 80,
+    tol: float = 5e-4,
 ) -> MultichannelResult:
     """Lightweight run for GIF frames.
 
