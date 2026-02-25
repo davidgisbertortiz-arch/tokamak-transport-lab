@@ -1,14 +1,15 @@
 """Headless GIF generation for README — no Streamlit required.
 
-Generates animated frames showing Te/Ti profiles as a parameter sweeps,
-then stitches them into a GIF using ``imageio`` (requires ``pip install -e '.[gif]'``).
+Generates portfolio-grade animated frames showing a P_heat sweep
+dashboard, then stitches them into a GIF via ``imageio``.
 
-Each frame is a **two-panel** figure:
+Each frame is a **3-panel + footer** dashboard:
 
-* **Left** — Te(ρ) and Ti(ρ) profiles with a text overlay
-  (swept param, Te0, final_residual, n_iters, converged).
-* **Right** — Te0 vs swept parameter curve with a moving marker
-  showing the current frame's position.
+* **Top-left (big)** — Te(ρ) and Ti(ρ) profiles.  Previous sweep
+  profiles shown as faint "ghost" lines; current frame is bold.
+* **Top-right upper** — Convergence: residual vs iteration (log scale).
+* **Top-right lower** — χ profiles: χ_turb + χ_neo decomposition.
+* **Footer strip** — compact metadata (S0_e, Te₀, residual, iters, converged).
 
 Usage::
 
@@ -29,7 +30,8 @@ from tokamak_transport_lab.integration.multichannel_picard import (
     MultichannelResult,
     run_picard_multichannel,
 )
-from tokamak_transport_lab.transport.stiffness import chi_total
+from tokamak_transport_lab.integration.picard import _compute_a_over_lte
+from tokamak_transport_lab.transport.stiffness import chi_total, chi_turbulent
 
 # ── defaults ─────────────────────────────────────────────────────
 
@@ -40,6 +42,19 @@ _TRANSPORT_PARAMS: dict[str, float] = {
     "alpha_s": 1.5,
     "chi_neo": 0.01,
 }
+
+# ── dark style setup ────────────────────────────────────────────
+
+_STYLE_CTX = "dark_background"
+_FIG_FACECOLOR = "#181818"
+_AX_FACECOLOR = "#222222"
+_GRID_COLOR = "#444444"
+_TEXT_COLOR = "#e0e0e0"
+_TE_COLOR = "#4fc3f7"  # vivid cyan
+_TI_COLOR = "#ff8a65"  # warm coral
+_CHI_TURB_COLOR = "#81c784"  # green
+_CHI_NEO_COLOR = "#ffb74d"  # amber
+_ACCENT = "#e53935"  # red accent marker
 
 
 # ── single run helper ───────────────────────────────────────────
@@ -98,7 +113,20 @@ def _run_for_gif(
 
 # ── frame rendering ─────────────────────────────────────────────
 
-_GIF_DPI = 130  # sharp enough for README embed
+_GIF_DPI = 130
+
+
+def _style_ax(ax: plt.Axes) -> None:
+    """Apply dark dashboard style to an axes."""
+    ax.set_facecolor(_AX_FACECOLOR)
+    ax.tick_params(colors=_TEXT_COLOR, labelsize=7)
+    ax.xaxis.label.set_color(_TEXT_COLOR)
+    ax.yaxis.label.set_color(_TEXT_COLOR)
+    ax.title.set_color(_TEXT_COLOR)
+    ax.title.set_fontsize(9)
+    for spine in ax.spines.values():
+        spine.set_color(_GRID_COLOR)
+    ax.grid(True, color=_GRID_COLOR, alpha=0.4, linewidth=0.5)
 
 
 def render_frame(
@@ -107,84 +135,141 @@ def render_frame(
     param_name: str = "S0_e",
     param_value: float = 1.0,
     te_ylim: tuple[float, float] | None = None,
-    sweep_values: np.ndarray | None = None,
-    sweep_te0s: np.ndarray | None = None,
+    chi_ylim: tuple[float, float] | None = None,
+    all_results: list[tuple[float, MultichannelResult]] | None = None,
     current_idx: int = 0,
 ) -> np.ndarray:
-    """Render a two-panel frame and return as RGB uint8 array.
+    """Render a 3-panel dashboard frame and return as RGB uint8 array."""
+    with plt.style.context(_STYLE_CTX):
+        fig = plt.figure(figsize=(11, 5.2), dpi=_GIF_DPI, facecolor=_FIG_FACECOLOR)
 
-    Left panel: Te(ρ) + Ti(ρ) profiles with metadata overlay.
-    Right panel: Te0 vs swept parameter with moving marker.
-    """
-    fig, (ax_prof, ax_trend) = plt.subplots(
-        1,
-        2,
-        figsize=(10, 4.2),
-        dpi=_GIF_DPI,
-        gridspec_kw={"width_ratios": [3, 2]},
-    )
+        # Layout: left panel spans full height, right column has 2 stacked
+        gs = fig.add_gridspec(
+            2, 2,
+            width_ratios=[3, 2],
+            height_ratios=[1, 1],
+            hspace=0.38,
+            wspace=0.32,
+            left=0.07,
+            right=0.96,
+            top=0.90,
+            bottom=0.15,
+        )
+        ax_prof = fig.add_subplot(gs[:, 0])  # full height left
+        ax_conv = fig.add_subplot(gs[0, 1])  # top right
+        ax_chi = fig.add_subplot(gs[1, 1])   # bottom right
 
-    # ── left panel: profiles ─────────────────────────────────────
-    ax_prof.plot(result.rho, result.te_final, "C0-", lw=2.2, label="Te")
-    ax_prof.plot(result.rho, result.ti_final, "C3--", lw=2.2, label="Ti")
-    ax_prof.set_xlabel("ρ")
-    ax_prof.set_ylabel("Temperature [eV]")
-    ax_prof.set_title("P_heat sweep — profiles")
-    ax_prof.legend(loc="upper right", fontsize=8)
-    ax_prof.grid(True, alpha=0.3)
-    if te_ylim is not None:
-        ax_prof.set_ylim(*te_ylim)
+        for ax in (ax_prof, ax_conv, ax_chi):
+            _style_ax(ax)
 
-    # Text overlay
-    n_iters = result.metadata.get("n_iters", len(result.residual_history))
-    final_resid = result.residual_history[-1] if result.residual_history else float("nan")
-    converged = result.metadata.get("converged", False)
-    te0 = float(result.te_final[0])
-    overlay = (
-        f"{param_name} = {param_value:.2f}\n"
-        f"Te0 = {te0:.0f} eV\n"
-        f"residual = {final_resid:.2e}\n"
-        f"n_iters = {n_iters}\n"
-        f"converged = {converged}"
-    )
-    ax_prof.text(
-        0.02,
-        0.97,
-        overlay,
-        transform=ax_prof.transAxes,
-        fontsize=7.5,
-        verticalalignment="top",
-        fontfamily="monospace",
-        bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.88},
-    )
+        # ── Panel 1: profiles ────────────────────────────────────
+        # Ghost lines for all sweep points (faint)
+        if all_results is not None:
+            for j, (_, r) in enumerate(all_results):
+                if j == current_idx:
+                    continue
+                ax_prof.plot(r.rho, r.te_final, color=_TE_COLOR, alpha=0.12, lw=0.8)
+                ax_prof.plot(r.rho, r.ti_final, color=_TI_COLOR, alpha=0.12, lw=0.8)
 
-    # ── right panel: Te0 vs swept param ──────────────────────────
-    if sweep_values is not None and sweep_te0s is not None:
-        ax_trend.plot(sweep_values, sweep_te0s, "C0-", lw=1.8, label="Te(0)")
-        ax_trend.plot(
-            sweep_values[current_idx],
-            sweep_te0s[current_idx],
-            "o",
-            color="C3",
-            markersize=9,
+        # Current frame bold
+        ax_prof.plot(
+            result.rho, result.te_final, color=_TE_COLOR, lw=2.5, label="Te", zorder=5
+        )
+        ax_prof.plot(
+            result.rho, result.ti_final, color=_TI_COLOR, lw=2.5, ls="--", label="Ti",
             zorder=5,
         )
-        ax_trend.set_xlabel(param_name)
-        ax_trend.set_ylabel("Te(0) [eV]")
-        ax_trend.set_title("Core temperature response")
-        ax_trend.grid(True, alpha=0.3)
-    else:
-        ax_trend.set_visible(False)
+        ax_prof.set_xlabel("ρ")
+        ax_prof.set_ylabel("Temperature [eV]")
+        ax_prof.set_title("Temperature profiles")
+        ax_prof.legend(
+            loc="upper right", fontsize=7, facecolor=_AX_FACECOLOR,
+            edgecolor=_GRID_COLOR, labelcolor=_TEXT_COLOR,
+        )
+        if te_ylim is not None:
+            ax_prof.set_ylim(*te_ylim)
 
-    fig.suptitle("tokamak-transport-lab", fontsize=11, fontweight="bold", y=0.99)
-    fig.tight_layout()
+        # ── Panel 2: convergence ─────────────────────────────────
+        if result.residual_history:
+            iters = np.arange(1, len(result.residual_history) + 1)
+            ax_conv.semilogy(
+                iters, result.residual_history, color=_TE_COLOR, lw=1.5,
+            )
+            tol_val = result.metadata.get("tol", 5e-4)
+            if isinstance(tol_val, str):
+                tol_val = 5e-4
+            ax_conv.axhline(
+                tol_val, color=_ACCENT, ls=":", lw=1, alpha=0.8,
+            )
+        ax_conv.set_xlabel("Picard iteration")
+        ax_conv.set_ylabel("Residual")
+        ax_conv.set_title("Convergence")
 
-    # Rasterise to numpy RGB array (drop alpha → smaller GIF)
-    fig.canvas.draw()
-    buf = fig.canvas.buffer_rgba()
-    rgba = np.asarray(buf, dtype=np.uint8)
-    rgb = rgba[:, :, :3].copy()
-    plt.close(fig)
+        # ── Panel 3: χ profiles ──────────────────────────────────
+        rho = result.rho
+        a_over_lte = _compute_a_over_lte(result.te_final, rho)
+        p = _TRANSPORT_PARAMS
+        chi_turb = chi_turbulent(
+            a_over_lte, chi_s=p["chi_s"], a_over_LTe_crit=p["a_over_LTe_crit"],
+            alpha_s=p["alpha_s"],
+        )
+        chi_neo_arr = np.full_like(rho, p["chi_neo"])
+
+        ax_chi.plot(rho, chi_turb, color=_CHI_TURB_COLOR, lw=1.8, label="χ_turb")
+        ax_chi.plot(rho, chi_neo_arr, color=_CHI_NEO_COLOR, lw=1.3, ls="--", label="χ_neo")
+        ax_chi.plot(
+            rho, result.chi_e_profile, color=_TEXT_COLOR, lw=1.0, ls=":", alpha=0.6,
+            label="χ_e total",
+        )
+        ax_chi.set_xlabel("ρ")
+        ax_chi.set_ylabel("Diffusivity χ")
+        ax_chi.set_title("Transport profiles")
+        ax_chi.legend(
+            loc="upper right", fontsize=6.5, facecolor=_AX_FACECOLOR,
+            edgecolor=_GRID_COLOR, labelcolor=_TEXT_COLOR,
+        )
+        if chi_ylim is not None:
+            ax_chi.set_ylim(*chi_ylim)
+
+        # ── Suptitle ─────────────────────────────────────────────
+        fig.suptitle(
+            "tokamak-transport-lab  ·  P_heat sweep",
+            fontsize=11, fontweight="bold", color=_TEXT_COLOR, y=0.97,
+        )
+
+        # ── Footer strip ─────────────────────────────────────────
+        n_iters = result.metadata.get("n_iters", len(result.residual_history))
+        final_resid = (
+            result.residual_history[-1] if result.residual_history else float("nan")
+        )
+        converged = result.metadata.get("converged", False)
+        te0 = float(result.te_final[0])
+        ti0 = float(result.ti_final[0])
+        footer = (
+            f"{param_name}={param_value:.2f}    "
+            f"Te\u2080={te0:.0f} eV    Ti\u2080={ti0:.0f} eV    "
+            f"residual={final_resid:.2e}    "
+            f"iters={n_iters}    "
+            f"converged={'✓' if converged else '✗'}"
+        )
+        fig.text(
+            0.5, 0.03, footer,
+            ha="center", va="center", fontsize=7.5, fontfamily="monospace",
+            color=_TEXT_COLOR,
+            bbox={
+                "boxstyle": "round,pad=0.3",
+                "facecolor": _AX_FACECOLOR,
+                "edgecolor": _GRID_COLOR,
+                "alpha": 0.85,
+            },
+        )
+
+        # Rasterise
+        fig.canvas.draw()
+        buf = fig.canvas.buffer_rgba()
+        rgba = np.asarray(buf, dtype=np.uint8)
+        rgb = rgba[:, :, :3].copy()
+        plt.close(fig)
     return rgb
 
 
@@ -212,18 +297,18 @@ def generate_gif(
         Sweep range.  Default 0.2 → 12.0 for ``S0_e`` produces
         clearly distinct profiles.
     n_frames : int
-        Number of frames in the GIF (default 12).
+        Number of frames (default 12).
     out_path : str or Path
         Destination file.
     duration_s : float
         Seconds per frame (default 0.45).
     base_kwargs : dict, optional
-        Override default run parameters (from YAML scenario config).
+        Override default run parameters (from YAML config).
 
     Returns
     -------
     pathlib.Path
-        The path to the generated GIF file.
+        Path to the generated GIF.
     """
     try:
         import imageio.v3 as iio
@@ -244,7 +329,6 @@ def generate_gif(
     if base_kwargs is not None:
         defaults.update(base_kwargs)
 
-    # Map sweep param name → _run_for_gif kwarg
     _param_key = {
         "S0_e": "s0_e",
         "te_ped": "te_ped",
@@ -254,9 +338,10 @@ def generate_gif(
     }
     run_key = _param_key.get(param, param)
 
-    # ── first pass: run all points, collect results ──────────────
+    # ── first pass: run all points ───────────────────────────────
     all_results: list[tuple[float, MultichannelResult]] = []
     te_max = 0.0
+    chi_max = 0.0
     for i, val in enumerate(values):
         kw = {**defaults, run_key: val}
         print(f"  frame {i + 1}/{n_frames}  {param}={val:.3f} …", end="", flush=True)
@@ -268,12 +353,10 @@ def generate_gif(
         )
         all_results.append((val, res))
         te_max = max(te_max, float(res.te_final.max()))
+        chi_max = max(chi_max, float(res.chi_e_profile.max()))
 
     te_ylim = (0.0, te_max * 1.15)
-
-    # Pre-compute Te0 array for the trend panel
-    sweep_vals = np.array([v for v, _ in all_results])
-    sweep_te0s = np.array([float(r.te_final[0]) for _, r in all_results])
+    chi_ylim = (0.0, max(chi_max * 1.2, 0.05))
 
     # ── second pass: render frames ───────────────────────────────
     frames: list[np.ndarray] = []
@@ -283,8 +366,8 @@ def generate_gif(
             param_name=param,
             param_value=val,
             te_ylim=te_ylim,
-            sweep_values=sweep_vals,
-            sweep_te0s=sweep_te0s,
+            chi_ylim=chi_ylim,
+            all_results=all_results,
             current_idx=idx,
         )
         frames.append(frame)
@@ -292,7 +375,6 @@ def generate_gif(
     out = pathlib.Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    # imageio v3 API — quantize=True keeps palette small
     iio.imwrite(
         out,
         frames,
