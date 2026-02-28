@@ -113,6 +113,9 @@ def _solve_tridiag(
 
     for i in range(1, n):
         denom = diag[i] - lower[i] * c[i - 1]
+        # Safety: avoid division by near-zero denominator
+        if abs(denom) < 1e-14:
+            denom = 1e-14 if denom >= 0 else -1e-14
         c[i] = upper[i] / denom if i < n - 1 else 0.0
         d[i] = (rhs[i] - lower[i] * d[i - 1]) / denom
 

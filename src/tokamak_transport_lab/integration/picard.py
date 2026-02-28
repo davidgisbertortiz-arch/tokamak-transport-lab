@@ -285,8 +285,8 @@ def run_picard(
             )
             used_fallback = True
 
-        # Ensure chi is positive (numerical floor)
-        chi = np.maximum(chi_new, 1e-6)
+        # Ensure chi is positive and bounded (numerical floor + cap)
+        chi = np.clip(chi_new, 1e-6, 100.0)
 
         # 4. Solver step
         te_new = _solver_step(
@@ -300,6 +300,14 @@ def run_picard(
             theta,
             sub_steps,
         )
+
+        # Guard: NaN / Inf from solver → abort early
+        if has_nonfinite(te_new):
+            logger.warning("Picard iter %d: solver produced NaN/Inf — aborting.", iteration)
+            break
+
+        # Positivity floor + runaway cap
+        te_new = np.clip(te_new, 10.0, 5.0e4)
 
         # 5. Under-relax
         te_mixed = mix_profiles(te, te_new, alpha)

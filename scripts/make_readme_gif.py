@@ -30,12 +30,12 @@ def main() -> None:
     parser.add_argument(
         "--param",
         type=str,
-        default="S0_e",
-        choices=["S0_e", "te_ped", "ti_ped", "density", "tau_eq"],
-        help="Parameter to sweep (default: S0_e)",
+        default="P_heat",
+        choices=["P_heat", "S0_e", "te_ped", "ti_ped", "density", "tau_eq"],
+        help="Parameter to sweep (default: P_heat)",
     )
-    parser.add_argument("--start", type=float, default=0.2, help="Sweep start value")
-    parser.add_argument("--end", type=float, default=12.0, help="Sweep end value")
+    parser.add_argument("--start", type=float, default=1.0, help="Sweep start value")
+    parser.add_argument("--end", type=float, default=15.0, help="Sweep end value")
     parser.add_argument("--n_frames", type=int, default=12, help="Number of GIF frames")
     parser.add_argument(
         "--out",

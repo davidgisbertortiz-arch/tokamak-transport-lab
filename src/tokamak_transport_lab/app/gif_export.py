@@ -9,13 +9,13 @@ Each frame is a **3-panel + footer** dashboard:
   profiles shown as faint "ghost" lines; current frame is bold.
 * **Top-right upper** — Convergence: residual vs iteration (log scale).
 * **Top-right lower** — χ profiles: χ_turb + χ_neo decomposition.
-* **Footer strip** — compact metadata (S0_e, Te₀, residual, iters, converged).
+* **Footer strip** — compact metadata (P_heat, Te₀, residual, iters, converged).
 
 Usage::
 
     python -m scripts.make_readme_gif
-    python -m scripts.make_readme_gif --config configs/scenarios/mid_power.yaml --n_frames 12
-    python -m scripts.make_readme_gif --param S0_e --start 0.2 --end 12 --n_frames 12
+    python -m scripts.make_readme_gif --n_frames 15
+    python -m scripts.make_readme_gif --param P_heat --start 1 --end 80 --n_frames 15
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import ScalarFormatter
 
 from tokamak_transport_lab.integration.multichannel_picard import (
     MultichannelResult,
@@ -35,12 +36,15 @@ from tokamak_transport_lab.transport.stiffness import chi_total, chi_turbulent
 
 # ── defaults ─────────────────────────────────────────────────────
 
-# Softer stiffness → profiles visibly respond to S0_e sweep
+# Transport tuned for visible sweep: chi_neo dominates diffusion so
+# Te0 responds to P_heat; chi_s is a small perturbation visible in
+# the χ panel.  tau_diff = L²/(4·chi_neo) ≈ 0.5 → Picard converges
+# in ~10 iterations with dt·sub_steps=0.05 per step.
 _TRANSPORT_PARAMS: dict[str, float] = {
-    "chi_s": 0.4,
+    "chi_s": 0.05,
     "a_over_LTe_crit": 2.0,
     "alpha_s": 1.5,
-    "chi_neo": 0.01,
+    "chi_neo": 0.5,
 }
 
 # ── dark style setup ────────────────────────────────────────────
@@ -57,11 +61,32 @@ _CHI_NEO_COLOR = "#ffb74d"  # amber
 _ACCENT = "#e53935"  # red accent marker
 
 
+# ── power-normalized source ─────────────────────────────────────
+
+
+def _power_to_s0(
+    p_heat: float,
+    rho: np.ndarray,
+    rho_dep: float = 0.3,
+    sigma: float = 0.1,
+) -> float:
+    """Convert total heating power *P_heat* to Gaussian source amplitude *S0*.
+
+    Solves  P_heat = ∫₀¹ S₀·exp(…) · V'(ρ) dρ  for S₀, where V'=ρ.
+    """
+    gauss = np.exp(-((rho - rho_dep) ** 2) / (2.0 * sigma**2))
+    vprime = np.copy(rho)
+    vprime[0] = max(vprime[0], 1e-30)
+    norm = float(np.trapz(gauss * vprime, rho))
+    return p_heat / max(norm, 1e-10)
+
+
 # ── single run helper ───────────────────────────────────────────
 
 
 def _run_for_gif(
     *,
+    p_heat: float | None = None,
     s0_e: float = 1.0,
     te_ped: float = 250.0,
     ti_ped: float = 200.0,
@@ -72,14 +97,20 @@ def _run_for_gif(
     alpha_s: float | None = None,
     chi_neo: float | None = None,
     n_rho: int = 50,
-    max_iters: int = 80,
-    tol: float = 5e-4,
+    max_iters: int = 60,
+    tol: float = 1e-3,
 ) -> MultichannelResult:
     """Lightweight run for GIF frames.
 
-    Defaults are tuned so low-to-high P_heat sweeps produce visually
-    distinct profiles with varying convergence behaviour.
+    If *p_heat* is given it is converted to *s0_e* via power
+    normalisation (preferred).  Otherwise *s0_e* is used directly.
     """
+    rho = np.linspace(0.0, 1.0, n_rho)
+
+    # Power-normalised source amplitude
+    if p_heat is not None:
+        s0_e = _power_to_s0(p_heat, rho)
+
     params_e = {
         "chi_s": chi_s if chi_s is not None else _TRANSPORT_PARAMS["chi_s"],
         "a_over_LTe_crit": (
@@ -103,11 +134,11 @@ def _run_for_gif(
         transport_params_e=params_e,
         transport_model_i=chi_total,
         transport_params_i=params_i,
-        dt=1e-4,
-        sub_steps=200,
+        dt=5e-4,
+        sub_steps=100,
         max_iters=max_iters,
         tol=tol,
-        alpha0=0.4,
+        alpha0=0.5,
     )
 
 
@@ -138,6 +169,7 @@ def render_frame(
     chi_ylim: tuple[float, float] | None = None,
     all_results: list[tuple[float, MultichannelResult]] | None = None,
     current_idx: int = 0,
+    total_frames: int = 1,
 ) -> np.ndarray:
     """Render a 3-panel dashboard frame and return as RGB uint8 array."""
     with plt.style.context(_STYLE_CTX):
@@ -182,6 +214,10 @@ def render_frame(
         ax_prof.set_xlabel("ρ")
         ax_prof.set_ylabel("Temperature [eV]")
         ax_prof.set_title("Temperature profiles")
+        # Disable scientific / offset notation on y-axis
+        _sfmt = ScalarFormatter(useOffset=False)
+        _sfmt.set_scientific(False)
+        ax_prof.yaxis.set_major_formatter(_sfmt)
         ax_prof.legend(
             loc="upper right", fontsize=7, facecolor=_AX_FACECOLOR,
             edgecolor=_GRID_COLOR, labelcolor=_TEXT_COLOR,
@@ -231,11 +267,33 @@ def render_frame(
         if chi_ylim is not None:
             ax_chi.set_ylim(*chi_ylim)
 
-        # ── Suptitle ─────────────────────────────────────────────
+        # ── Suptitle + frame counter ────────────────────────────
         fig.suptitle(
             "tokamak-transport-lab  ·  P_heat sweep",
             fontsize=11, fontweight="bold", color=_TEXT_COLOR, y=0.97,
         )
+        # Frame counter badge (top-right)
+        frame_label = f"frame {current_idx + 1}/{total_frames}"
+        fig.text(
+            0.96, 0.97, frame_label,
+            ha="right", va="top", fontsize=7.5, fontfamily="monospace",
+            color=_ACCENT, fontweight="bold",
+        )
+
+        # NOT CONVERGED warning badge
+        converged = result.metadata.get("converged", True)
+        if not converged:
+            fig.text(
+                0.50, 0.92, "NOT CONVERGED",
+                ha="center", va="top", fontsize=9, fontfamily="monospace",
+                color="#ffeb3b", fontweight="bold",
+                bbox={
+                    "boxstyle": "round,pad=0.2",
+                    "facecolor": _ACCENT,
+                    "edgecolor": "#ffeb3b",
+                    "alpha": 0.9,
+                },
+            )
 
         # ── Footer strip ─────────────────────────────────────────
         n_iters = result.metadata.get("n_iters", len(result.residual_history))
@@ -253,8 +311,8 @@ def render_frame(
             f"converged={'✓' if converged else '✗'}"
         )
         fig.text(
-            0.5, 0.03, footer,
-            ha="center", va="center", fontsize=7.5, fontfamily="monospace",
+            0.07, 0.03, footer,
+            ha="left", va="center", fontsize=7.5, fontfamily="monospace",
             color=_TEXT_COLOR,
             bbox={
                 "boxstyle": "round,pad=0.3",
@@ -278,9 +336,9 @@ def render_frame(
 
 def generate_gif(
     *,
-    param: str = "S0_e",
-    start: float = 0.2,
-    end: float = 12.0,
+    param: str = "P_heat",
+    start: float = 1.0,
+    end: float = 15.0,
     n_frames: int = 12,
     out_path: str | pathlib.Path = "assets/demo.gif",
     duration_s: float = 0.45,
@@ -291,10 +349,10 @@ def generate_gif(
     Parameters
     ----------
     param : str
-        Parameter to sweep.  One of ``S0_e``, ``te_ped``, ``ti_ped``,
-        ``density``, ``tau_eq``.
+        Parameter to sweep.  One of ``P_heat``, ``S0_e``, ``te_ped``,
+        ``ti_ped``, ``density``, ``tau_eq``.
     start, end : float
-        Sweep range.  Default 0.2 → 12.0 for ``S0_e`` produces
+        Sweep range.  Default 1.0 → 15.0 for ``P_heat`` produces
         clearly distinct profiles.
     n_frames : int
         Number of frames (default 12).
@@ -320,6 +378,7 @@ def generate_gif(
 
     # ── defaults (may be overridden by base_kwargs) ──────────────
     defaults: dict[str, Any] = {
+        "p_heat": 10.0,
         "s0_e": 1.0,
         "te_ped": 250.0,
         "ti_ped": 200.0,
@@ -330,6 +389,7 @@ def generate_gif(
         defaults.update(base_kwargs)
 
     _param_key = {
+        "P_heat": "p_heat",
         "S0_e": "s0_e",
         "te_ped": "te_ped",
         "ti_ped": "ti_ped",
@@ -369,6 +429,7 @@ def generate_gif(
             chi_ylim=chi_ylim,
             all_results=all_results,
             current_idx=idx,
+            total_frames=n_frames,
         )
         frames.append(frame)
 

@@ -260,8 +260,8 @@ def run_picard_multichannel(
             chi_i_new = np.asarray(fallback_model(a_over_lti, **fallback_params), dtype=np.float64)
             used_fallback = True
 
-        chi_e = np.maximum(chi_e_new, 1e-6)
-        chi_i = np.maximum(chi_i_new, 1e-6)
+        chi_e = np.clip(chi_e_new, 1e-6, 100.0)
+        chi_i = np.clip(chi_i_new, 1e-6, 100.0)
 
         # 4. Compute coupling term (lagged: uses current Te, Ti)
         s_ei = equilibration_source(te, ti, density=density, tau_eq=tau_eq)
@@ -274,9 +274,21 @@ def run_picard_multichannel(
         source_i_eff = source_i + s_ei
         ti_new = _solver_step(ti, rho, chi_i, vp, source_i_eff, ti_ped, dt, theta, sub_steps)
 
+        # Guard: NaN / Inf from solver → abort early
+        if has_nonfinite(te_new) or has_nonfinite(ti_new):
+            logger.warning("Iter %d: solver produced NaN/Inf — aborting.", iteration)
+            break
+
         # Floor: temperatures must remain positive (min 10 eV)
         te_new = np.maximum(te_new, 10.0)
         ti_new = np.maximum(ti_new, 10.0)
+
+        # Cap: prevent runaway (max 50 keV)
+        _t_cap = 5.0e4
+        if float(te_new.max()) > _t_cap or float(ti_new.max()) > _t_cap:
+            logger.warning("Iter %d: T exceeds %.0e eV cap — clamping.", iteration, _t_cap)
+            te_new = np.minimum(te_new, _t_cap)
+            ti_new = np.minimum(ti_new, _t_cap)
 
         # 7. Under-relax both channels
         te_mixed = np.asarray(mix_profiles(te, te_new, alpha), dtype=np.float64)
@@ -320,6 +332,20 @@ def run_picard_multichannel(
             transport_params_i = dict(fallback_params)
             used_fallback = True
             divergence_counter = 0
+
+        # 10b. No-progress early stop: if residual hasn't improved
+        # by at least 5% over the last 10 iterations, stop early.
+        _stall_window = 10
+        if len(residual_history) >= _stall_window:
+            old_res = residual_history[-_stall_window]
+            if residual >= old_res * 0.95:
+                logger.info(
+                    "Iter %d: no progress over last %d iters (%.2e → %.2e) — stopping.",
+                    iteration, _stall_window, old_res, residual,
+                )
+                te = te_mixed
+                ti = ti_mixed
+                break
 
         # 11. Convergence check
         if is_converged(residual, tol):
