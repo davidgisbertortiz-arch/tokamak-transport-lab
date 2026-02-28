@@ -36,15 +36,16 @@ from tokamak_transport_lab.transport.stiffness import chi_total, chi_turbulent
 
 # ── defaults ─────────────────────────────────────────────────────
 
-# Transport tuned for visible sweep: chi_neo dominates diffusion so
-# Te0 responds to P_heat; chi_s is a small perturbation visible in
-# the χ panel.  tau_diff = L²/(4·chi_neo) ≈ 0.5 → Picard converges
-# in ~10 iterations with dt·sub_steps=0.05 per step.
+# Demo transport: chi_neo dominates so Te0 responds linearly to P_heat.
+# chi_s adds a small visible turbulent bump in the χ panel.
+# tau_diff = L²/(4·chi_neo) ≈ 2.5  →  dt·sub_steps=0.02 per Picard
+# iteration, ~50 iters = 1.0 ≈ tau_diff/2 → converges when starting
+# from a flat (pedestal) initial profile.
 _TRANSPORT_PARAMS: dict[str, float] = {
     "chi_s": 0.05,
     "a_over_LTe_crit": 2.0,
     "alpha_s": 1.5,
-    "chi_neo": 0.5,
+    "chi_neo": 0.1,
 }
 
 # ── dark style setup ────────────────────────────────────────────
@@ -90,8 +91,8 @@ def _run_for_gif(
     s0_e: float = 1.0,
     te_ped: float = 250.0,
     ti_ped: float = 200.0,
-    density: float = 1.0,
-    tau_eq: float = 0.01,
+    density: float = 0.2,
+    tau_eq: float = 0.5,
     chi_s: float | None = None,
     a_over_LTe_crit: float | None = None,
     alpha_s: float | None = None,
@@ -104,6 +105,15 @@ def _run_for_gif(
 
     If *p_heat* is given it is converted to *s0_e* via power
     normalisation (preferred).  Otherwise *s0_e* is used directly.
+
+    Key design choices for demo stability:
+    * Flat initial profiles at pedestal temperature — the solver
+      *builds up* from T_ped instead of trying to diffuse a steep
+      initial guess (which causes transient blow-up).
+    * Weak equilibration (``tau_eq=0.5``) and low density (0.2) so
+      the coupling source S_ei stays small.
+    * CN step sized for convergence: ``dt=1e-3, sub_steps=300``
+      (dt·sub_steps=0.3 per Picard iteration, ~12× τ_diff in 60 iters).
     """
     rho = np.linspace(0.0, 1.0, n_rho)
 
@@ -122,6 +132,12 @@ def _run_for_gif(
         "chi_neo": chi_neo if chi_neo is not None else _TRANSPORT_PARAMS["chi_neo"],
     }
     params_i = {**params_e, "chi_s": params_e["chi_s"] * 0.5}
+
+    # Start from flat profiles at pedestal T → solver builds up,
+    # no overshoot from steep initial gradients.
+    te_init = np.full(n_rho, te_ped)
+    ti_init = np.full(n_rho, ti_ped)
+
     return run_picard_multichannel(
         n_rho=n_rho,
         te_ped=te_ped,
@@ -134,11 +150,13 @@ def _run_for_gif(
         transport_params_e=params_e,
         transport_model_i=chi_total,
         transport_params_i=params_i,
-        dt=5e-4,
-        sub_steps=100,
+        dt=1e-3,
+        sub_steps=300,
         max_iters=max_iters,
         tol=tol,
         alpha0=0.5,
+        te_init=te_init,
+        ti_init=ti_init,
     )
 
 
@@ -377,13 +395,15 @@ def generate_gif(
     values = np.linspace(start, end, n_frames)
 
     # ── defaults (may be overridden by base_kwargs) ──────────────
+    # density & tau_eq are kept small so Te–Ti coupling doesn't
+    # overwhelm the profiles during the sweep.
     defaults: dict[str, Any] = {
         "p_heat": 10.0,
         "s0_e": 1.0,
         "te_ped": 250.0,
         "ti_ped": 200.0,
-        "density": 1.0,
-        "tau_eq": 0.01,
+        "density": 0.2,
+        "tau_eq": 0.5,
     }
     if base_kwargs is not None:
         defaults.update(base_kwargs)
@@ -417,6 +437,15 @@ def generate_gif(
 
     te_ylim = (0.0, te_max * 1.15)
     chi_ylim = (0.0, max(chi_max * 1.2, 0.05))
+
+    # ── summary ──────────────────────────────────────────────────
+    te0_vals = [r.te_final[0] for _, r in all_results]
+    n_conv = sum(1 for _, r in all_results if r.metadata.get("converged"))
+    print(
+        f"\n  ── sweep summary ──\n"
+        f"  converged: {n_conv}/{n_frames}    "
+        f"Te0 range: {min(te0_vals):.0f} – {max(te0_vals):.0f} eV\n"
+    )
 
     # ── second pass: render frames ───────────────────────────────
     frames: list[np.ndarray] = []
