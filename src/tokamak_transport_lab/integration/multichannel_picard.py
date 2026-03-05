@@ -341,7 +341,10 @@ def run_picard_multichannel(
             if residual >= old_res * 0.95:
                 logger.info(
                     "Iter %d: no progress over last %d iters (%.2e → %.2e) — stopping.",
-                    iteration, _stall_window, old_res, residual,
+                    iteration,
+                    _stall_window,
+                    old_res,
+                    residual,
                 )
                 te = te_mixed
                 ti = ti_mixed

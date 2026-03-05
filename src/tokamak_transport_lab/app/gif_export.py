@@ -195,7 +195,8 @@ def render_frame(
 
         # Layout: left panel spans full height, right column has 2 stacked
         gs = fig.add_gridspec(
-            2, 2,
+            2,
+            2,
             width_ratios=[3, 2],
             height_ratios=[1, 1],
             hspace=0.38,
@@ -207,7 +208,7 @@ def render_frame(
         )
         ax_prof = fig.add_subplot(gs[:, 0])  # full height left
         ax_conv = fig.add_subplot(gs[0, 1])  # top right
-        ax_chi = fig.add_subplot(gs[1, 1])   # bottom right
+        ax_chi = fig.add_subplot(gs[1, 1])  # bottom right
 
         for ax in (ax_prof, ax_conv, ax_chi):
             _style_ax(ax)
@@ -222,11 +223,14 @@ def render_frame(
                 ax_prof.plot(r.rho, r.ti_final, color=_TI_COLOR, alpha=0.12, lw=0.8)
 
         # Current frame bold
+        ax_prof.plot(result.rho, result.te_final, color=_TE_COLOR, lw=2.5, label="Te", zorder=5)
         ax_prof.plot(
-            result.rho, result.te_final, color=_TE_COLOR, lw=2.5, label="Te", zorder=5
-        )
-        ax_prof.plot(
-            result.rho, result.ti_final, color=_TI_COLOR, lw=2.5, ls="--", label="Ti",
+            result.rho,
+            result.ti_final,
+            color=_TI_COLOR,
+            lw=2.5,
+            ls="--",
+            label="Ti",
             zorder=5,
         )
         ax_prof.set_xlabel("ρ")
@@ -237,8 +241,11 @@ def render_frame(
         _sfmt.set_scientific(False)
         ax_prof.yaxis.set_major_formatter(_sfmt)
         ax_prof.legend(
-            loc="upper right", fontsize=7, facecolor=_AX_FACECOLOR,
-            edgecolor=_GRID_COLOR, labelcolor=_TEXT_COLOR,
+            loc="upper right",
+            fontsize=7,
+            facecolor=_AX_FACECOLOR,
+            edgecolor=_GRID_COLOR,
+            labelcolor=_TEXT_COLOR,
         )
         if te_ylim is not None:
             ax_prof.set_ylim(*te_ylim)
@@ -247,13 +254,20 @@ def render_frame(
         if result.residual_history:
             iters = np.arange(1, len(result.residual_history) + 1)
             ax_conv.semilogy(
-                iters, result.residual_history, color=_TE_COLOR, lw=1.5,
+                iters,
+                result.residual_history,
+                color=_TE_COLOR,
+                lw=1.5,
             )
             tol_val = result.metadata.get("tol", 5e-4)
             if isinstance(tol_val, str):
                 tol_val = 5e-4
             ax_conv.axhline(
-                tol_val, color=_ACCENT, ls=":", lw=1, alpha=0.8,
+                tol_val,
+                color=_ACCENT,
+                ls=":",
+                lw=1,
+                alpha=0.8,
             )
         ax_conv.set_xlabel("Picard iteration")
         ax_conv.set_ylabel("Residual")
@@ -264,7 +278,9 @@ def render_frame(
         a_over_lte = _compute_a_over_lte(result.te_final, rho)
         p = _TRANSPORT_PARAMS
         chi_turb = chi_turbulent(
-            a_over_lte, chi_s=p["chi_s"], a_over_LTe_crit=p["a_over_LTe_crit"],
+            a_over_lte,
+            chi_s=p["chi_s"],
+            a_over_LTe_crit=p["a_over_LTe_crit"],
             alpha_s=p["alpha_s"],
         )
         chi_neo_arr = np.full_like(rho, p["chi_neo"])
@@ -272,15 +288,23 @@ def render_frame(
         ax_chi.plot(rho, chi_turb, color=_CHI_TURB_COLOR, lw=1.8, label="χ_turb")
         ax_chi.plot(rho, chi_neo_arr, color=_CHI_NEO_COLOR, lw=1.3, ls="--", label="χ_neo")
         ax_chi.plot(
-            rho, result.chi_e_profile, color=_TEXT_COLOR, lw=1.0, ls=":", alpha=0.6,
+            rho,
+            result.chi_e_profile,
+            color=_TEXT_COLOR,
+            lw=1.0,
+            ls=":",
+            alpha=0.6,
             label="χ_e total",
         )
         ax_chi.set_xlabel("ρ")
         ax_chi.set_ylabel("Diffusivity χ")
         ax_chi.set_title("Transport profiles")
         ax_chi.legend(
-            loc="upper right", fontsize=6.5, facecolor=_AX_FACECOLOR,
-            edgecolor=_GRID_COLOR, labelcolor=_TEXT_COLOR,
+            loc="upper right",
+            fontsize=6.5,
+            facecolor=_AX_FACECOLOR,
+            edgecolor=_GRID_COLOR,
+            labelcolor=_TEXT_COLOR,
         )
         if chi_ylim is not None:
             ax_chi.set_ylim(*chi_ylim)
@@ -288,23 +312,38 @@ def render_frame(
         # ── Suptitle + frame counter ────────────────────────────
         fig.suptitle(
             "tokamak-transport-lab  ·  P_heat sweep",
-            fontsize=11, fontweight="bold", color=_TEXT_COLOR, y=0.97,
+            fontsize=11,
+            fontweight="bold",
+            color=_TEXT_COLOR,
+            y=0.97,
         )
         # Frame counter badge (top-right)
         frame_label = f"frame {current_idx + 1}/{total_frames}"
         fig.text(
-            0.96, 0.97, frame_label,
-            ha="right", va="top", fontsize=7.5, fontfamily="monospace",
-            color=_ACCENT, fontweight="bold",
+            0.96,
+            0.97,
+            frame_label,
+            ha="right",
+            va="top",
+            fontsize=7.5,
+            fontfamily="monospace",
+            color=_ACCENT,
+            fontweight="bold",
         )
 
         # NOT CONVERGED warning badge
         converged = result.metadata.get("converged", True)
         if not converged:
             fig.text(
-                0.50, 0.92, "NOT CONVERGED",
-                ha="center", va="top", fontsize=9, fontfamily="monospace",
-                color="#ffeb3b", fontweight="bold",
+                0.50,
+                0.92,
+                "NOT CONVERGED",
+                ha="center",
+                va="top",
+                fontsize=9,
+                fontfamily="monospace",
+                color="#ffeb3b",
+                fontweight="bold",
                 bbox={
                     "boxstyle": "round,pad=0.2",
                     "facecolor": _ACCENT,
@@ -315,9 +354,7 @@ def render_frame(
 
         # ── Footer strip ─────────────────────────────────────────
         n_iters = result.metadata.get("n_iters", len(result.residual_history))
-        final_resid = (
-            result.residual_history[-1] if result.residual_history else float("nan")
-        )
+        final_resid = result.residual_history[-1] if result.residual_history else float("nan")
         converged = result.metadata.get("converged", False)
         te0 = float(result.te_final[0])
         ti0 = float(result.ti_final[0])
@@ -329,8 +366,13 @@ def render_frame(
             f"converged={'✓' if converged else '✗'}"
         )
         fig.text(
-            0.07, 0.03, footer,
-            ha="left", va="center", fontsize=7.5, fontfamily="monospace",
+            0.07,
+            0.03,
+            footer,
+            ha="left",
+            va="center",
+            fontsize=7.5,
+            fontfamily="monospace",
             color=_TEXT_COLOR,
             bbox={
                 "boxstyle": "round,pad=0.3",
