@@ -34,8 +34,8 @@ def main() -> None:
         choices=["P_heat", "S0_e", "te_ped", "ti_ped", "density", "tau_eq"],
         help="Parameter to sweep (default: P_heat)",
     )
-    parser.add_argument("--start", type=float, default=1.0, help="Sweep start value")
-    parser.add_argument("--end", type=float, default=15.0, help="Sweep end value")
+    parser.add_argument("--start", type=float, default=2.0, help="Sweep start value")
+    parser.add_argument("--end", type=float, default=120.0, help="Sweep end value")
     parser.add_argument("--n_frames", type=int, default=12, help="Number of GIF frames")
     parser.add_argument(
         "--out",

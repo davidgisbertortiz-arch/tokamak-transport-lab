@@ -36,16 +36,19 @@ from tokamak_transport_lab.transport.stiffness import chi_total, chi_turbulent
 
 # ── defaults ─────────────────────────────────────────────────────
 
-# Demo transport: chi_neo dominates so Te0 responds linearly to P_heat.
-# chi_s adds a small visible turbulent bump in the χ panel.
-# tau_diff = L²/(4·chi_neo) ≈ 2.5  →  dt·sub_steps=0.02 per Picard
-# iteration, ~50 iters = 1.0 ≈ tau_diff/2 → converges when starting
-# from a flat (pedestal) initial profile.
+# Demo transport tuned for a visually interesting GIF:
+#   • Low chi_neo (0.02) → profiles must steepen before diffusion
+#     balances the source, producing peaked Te(ρ).
+#   • Low critical gradient (0.08) → turbulence activates easily
+#     once profiles develop any significant slope.
+#   • High chi_s (3.0) → large visible turbulent bump in the χ panel
+#     that grows dramatically with P_heat.
+#   • alpha_s=1.0 (linear) → smooth, proportional χ_turb response.
 _TRANSPORT_PARAMS: dict[str, float] = {
-    "chi_s": 0.05,
-    "a_over_LTe_crit": 2.0,
-    "alpha_s": 1.5,
-    "chi_neo": 0.1,
+    "chi_s": 3.0,
+    "a_over_LTe_crit": 0.08,
+    "alpha_s": 1.0,
+    "chi_neo": 0.02,
 }
 
 # ── dark style setup ────────────────────────────────────────────
@@ -98,7 +101,7 @@ def _run_for_gif(
     alpha_s: float | None = None,
     chi_neo: float | None = None,
     n_rho: int = 50,
-    max_iters: int = 60,
+    max_iters: int = 80,
     tol: float = 1e-3,
 ) -> MultichannelResult:
     """Lightweight run for GIF frames.
@@ -162,20 +165,21 @@ def _run_for_gif(
 
 # ── frame rendering ─────────────────────────────────────────────
 
-_GIF_DPI = 130
+_GIF_DPI = 150
 
 
 def _style_ax(ax: plt.Axes) -> None:
     """Apply dark dashboard style to an axes."""
     ax.set_facecolor(_AX_FACECOLOR)
-    ax.tick_params(colors=_TEXT_COLOR, labelsize=7)
+    ax.tick_params(colors=_TEXT_COLOR, labelsize=8)
     ax.xaxis.label.set_color(_TEXT_COLOR)
     ax.yaxis.label.set_color(_TEXT_COLOR)
     ax.title.set_color(_TEXT_COLOR)
-    ax.title.set_fontsize(9)
+    ax.title.set_fontsize(10.5)
+    ax.title.set_fontweight("bold")
     for spine in ax.spines.values():
         spine.set_color(_GRID_COLOR)
-    ax.grid(True, color=_GRID_COLOR, alpha=0.4, linewidth=0.5)
+    ax.grid(True, color=_GRID_COLOR, alpha=0.35, linewidth=0.5)
 
 
 def render_frame(
@@ -191,7 +195,7 @@ def render_frame(
 ) -> np.ndarray:
     """Render a 3-panel dashboard frame and return as RGB uint8 array."""
     with plt.style.context(_STYLE_CTX):
-        fig = plt.figure(figsize=(11, 5.2), dpi=_GIF_DPI, facecolor=_FIG_FACECOLOR)
+        fig = plt.figure(figsize=(13, 6.2), dpi=_GIF_DPI, facecolor=_FIG_FACECOLOR)
 
         # Layout: left panel spans full height, right column has 2 stacked
         gs = fig.add_gridspec(
@@ -199,12 +203,12 @@ def render_frame(
             2,
             width_ratios=[3, 2],
             height_ratios=[1, 1],
-            hspace=0.38,
-            wspace=0.32,
-            left=0.07,
-            right=0.96,
-            top=0.90,
-            bottom=0.15,
+            hspace=0.42,
+            wspace=0.30,
+            left=0.06,
+            right=0.97,
+            top=0.88,
+            bottom=0.14,
         )
         ax_prof = fig.add_subplot(gs[:, 0])  # full height left
         ax_conv = fig.add_subplot(gs[0, 1])  # top right
@@ -233,8 +237,8 @@ def render_frame(
             label="Ti",
             zorder=5,
         )
-        ax_prof.set_xlabel("ρ")
-        ax_prof.set_ylabel("Temperature [eV]")
+        ax_prof.set_xlabel("ρ", fontsize=9.5)
+        ax_prof.set_ylabel("Temperature [eV]", fontsize=9.5)
         ax_prof.set_title("Temperature profiles")
         # Disable scientific / offset notation on y-axis
         _sfmt = ScalarFormatter(useOffset=False)
@@ -242,7 +246,7 @@ def render_frame(
         ax_prof.yaxis.set_major_formatter(_sfmt)
         ax_prof.legend(
             loc="upper right",
-            fontsize=7,
+            fontsize=8,
             facecolor=_AX_FACECOLOR,
             edgecolor=_GRID_COLOR,
             labelcolor=_TEXT_COLOR,
@@ -269,8 +273,8 @@ def render_frame(
                 lw=1,
                 alpha=0.8,
             )
-        ax_conv.set_xlabel("Picard iteration")
-        ax_conv.set_ylabel("Residual")
+        ax_conv.set_xlabel("Picard iteration", fontsize=8.5)
+        ax_conv.set_ylabel("Residual", fontsize=8.5)
         ax_conv.set_title("Convergence")
 
         # ── Panel 3: χ profiles ──────────────────────────────────
@@ -296,12 +300,12 @@ def render_frame(
             alpha=0.6,
             label="χ_e total",
         )
-        ax_chi.set_xlabel("ρ")
-        ax_chi.set_ylabel("Diffusivity χ")
+        ax_chi.set_xlabel("ρ", fontsize=8.5)
+        ax_chi.set_ylabel("Diffusivity χ", fontsize=8.5)
         ax_chi.set_title("Transport profiles")
         ax_chi.legend(
             loc="upper right",
-            fontsize=6.5,
+            fontsize=7,
             facecolor=_AX_FACECOLOR,
             edgecolor=_GRID_COLOR,
             labelcolor=_TEXT_COLOR,
@@ -312,7 +316,7 @@ def render_frame(
         # ── Suptitle + frame counter ────────────────────────────
         fig.suptitle(
             "tokamak-transport-lab  ·  P_heat sweep",
-            fontsize=11,
+            fontsize=13,
             fontweight="bold",
             color=_TEXT_COLOR,
             y=0.97,
@@ -320,12 +324,12 @@ def render_frame(
         # Frame counter badge (top-right)
         frame_label = f"frame {current_idx + 1}/{total_frames}"
         fig.text(
-            0.96,
+            0.97,
             0.97,
             frame_label,
             ha="right",
             va="top",
-            fontsize=7.5,
+            fontsize=8.5,
             fontfamily="monospace",
             color=_ACCENT,
             fontweight="bold",
@@ -366,19 +370,19 @@ def render_frame(
             f"converged={'✓' if converged else '✗'}"
         )
         fig.text(
-            0.07,
+            0.06,
             0.03,
             footer,
             ha="left",
             va="center",
-            fontsize=7.5,
+            fontsize=8,
             fontfamily="monospace",
             color=_TEXT_COLOR,
             bbox={
-                "boxstyle": "round,pad=0.3",
+                "boxstyle": "round,pad=0.35",
                 "facecolor": _AX_FACECOLOR,
                 "edgecolor": _GRID_COLOR,
-                "alpha": 0.85,
+                "alpha": 0.9,
             },
         )
 
@@ -397,8 +401,8 @@ def render_frame(
 def generate_gif(
     *,
     param: str = "P_heat",
-    start: float = 1.0,
-    end: float = 15.0,
+    start: float = 2.0,
+    end: float = 120.0,
     n_frames: int = 12,
     out_path: str | pathlib.Path = "assets/demo.gif",
     duration_s: float = 0.45,
