@@ -5,7 +5,6 @@ Ensures Te[-1] == Te_ped and Ti[-1] == Ti_ped after Picard convergence.
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 from tokamak_transport_lab.integration.multichannel_picard import run_picard_multichannel
