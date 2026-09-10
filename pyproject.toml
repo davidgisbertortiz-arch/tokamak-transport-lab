@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tokamak-transport-lab"
 version = "0.1.0"
-description = "Interactive integrated modeling playground: diffusion solver, ML transport surrogate, calibrated uncertainty."
+description = "Verified educational radial heat diffusion, synthetic ML closures, and scoped conformal profile intervals."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"

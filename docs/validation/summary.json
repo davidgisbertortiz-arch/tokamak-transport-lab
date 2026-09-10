@@ -1,0 +1,237 @@
+{
+  "python": "3.11.12",
+  "numpy": "2.0.2",
+  "scipy": "1.14.1",
+  "source_sha256": "35501952f51b6756f40e4ddb4fb119e48f13fec2e4d3b0953a3ed52aacf134a5",
+  "git_base": "fca9b6976e5b76de9ca8a082ad145b5b80a16a5b",
+  "grid_refinement": [
+    {
+      "n_rho": 31,
+      "relative_rise_error": 0.0004850770339210219
+    },
+    {
+      "n_rho": 61,
+      "relative_rise_error": 0.00012099093115913624,
+      "observed_order": 2.0033149616797377
+    },
+    {
+      "n_rho": 121,
+      "relative_rise_error": 3.0236759062131018e-05,
+      "observed_order": 2.0005234975827384
+    },
+    {
+      "n_rho": 241,
+      "relative_rise_error": 7.5595612719575015e-06,
+      "observed_order": 1.9999290985775984
+    }
+  ],
+  "default_transient_steady_residual": 3.3998658942371846e-09,
+  "initial_condition_spread_eV": 0.0,
+  "scenarios": {
+    "high_power": {
+      "n_iters": 58,
+      "converged": true,
+      "final_residual": 1.1209849501976575e-08,
+      "residual_kind": "source_scaled_pde_l2",
+      "used_fallback": false,
+      "used_newton": true,
+      "transport_evaluations": 1008,
+      "hybrid_function_evaluations": 0,
+      "termination_reason": "converged",
+      "wall_time_s": 2.0813322819994937,
+      "temperature_clips": 0,
+      "te_core_eV": 13781.991977294627,
+      "ti_core_eV": 13289.58560197235,
+      "tol": 1e-05,
+      "transport_model": "analytic",
+      "geometry": "circular",
+      "artifact_sha256": null,
+      "out_of_domain_fraction": 0.0
+    },
+    "low_power": {
+      "n_iters": 5,
+      "converged": true,
+      "final_residual": 8.546677852667765e-11,
+      "residual_kind": "source_scaled_pde_l2",
+      "used_fallback": false,
+      "used_newton": false,
+      "transport_evaluations": 11,
+      "hybrid_function_evaluations": 0,
+      "termination_reason": "converged",
+      "wall_time_s": 0.02969588500127429,
+      "temperature_clips": 0,
+      "te_core_eV": 281.5925135695514,
+      "ti_core_eV": 281.3159234977482,
+      "tol": 1e-05,
+      "transport_model": "analytic",
+      "geometry": "circular",
+      "artifact_sha256": null,
+      "out_of_domain_fraction": 0.0
+    },
+    "mid_power": {
+      "n_iters": 45,
+      "converged": true,
+      "final_residual": 4.4937181919953995e-06,
+      "residual_kind": "source_scaled_pde_l2",
+      "used_fallback": false,
+      "used_newton": true,
+      "transport_evaluations": 720,
+      "hybrid_function_evaluations": 0,
+      "termination_reason": "converged",
+      "wall_time_s": 1.4473660929979815,
+      "temperature_clips": 0,
+      "te_core_eV": 3925.4239761945587,
+      "ti_core_eV": 3867.2368399002803,
+      "tol": 1e-05,
+      "transport_model": "analytic",
+      "geometry": "circular",
+      "artifact_sha256": null,
+      "out_of_domain_fraction": 0.0
+    }
+  },
+  "legacy_scenarios": {
+    "high_power": {
+      "n_iters": 12,
+      "converged": true,
+      "final_residual": 1.9923955491668254e-08,
+      "residual_kind": "source_scaled_pde_l2",
+      "used_fallback": false,
+      "used_newton": true,
+      "transport_evaluations": 102,
+      "hybrid_function_evaluations": 0,
+      "termination_reason": "converged",
+      "wall_time_s": 0.20902347700030077,
+      "temperature_clips": 0,
+      "te_core_eV": 1278.2225903096225,
+      "ti_core_eV": 1278.2222009243499,
+      "tol": 0.0001,
+      "transport_model": "analytic",
+      "geometry": "miller",
+      "artifact_sha256": null,
+      "out_of_domain_fraction": 0.0
+    },
+    "low_power": {
+      "n_iters": 11,
+      "converged": true,
+      "final_residual": 1.3946937007898625e-07,
+      "residual_kind": "source_scaled_pde_l2",
+      "used_fallback": false,
+      "used_newton": true,
+      "transport_evaluations": 57,
+      "hybrid_function_evaluations": 0,
+      "termination_reason": "converged",
+      "wall_time_s": 0.12309499500042875,
+      "temperature_clips": 0,
+      "te_core_eV": 271.76203821579634,
+      "ti_core_eV": 271.7619987126103,
+      "tol": 0.001,
+      "transport_model": "analytic",
+      "geometry": "circular",
+      "artifact_sha256": null,
+      "out_of_domain_fraction": 0.0
+    },
+    "mid_power": {
+      "n_iters": 11,
+      "converged": true,
+      "final_residual": 4.2884852172381405e-08,
+      "residual_kind": "source_scaled_pde_l2",
+      "used_fallback": false,
+      "used_newton": true,
+      "transport_evaluations": 57,
+      "hybrid_function_evaluations": 0,
+      "termination_reason": "converged",
+      "wall_time_s": 0.12782150600105524,
+      "temperature_clips": 0,
+      "te_core_eV": 427.93460661322007,
+      "ti_core_eV": 427.93457707433555,
+      "tol": 0.0001,
+      "transport_model": "analytic",
+      "geometry": "circular",
+      "artifact_sha256": null,
+      "out_of_domain_fraction": 0.0
+    }
+  },
+  "ml_test_metrics": {
+    "ensemble": {
+      "r2": 0.9999091126203264,
+      "mae": 0.15849761004920526,
+      "max_error": 5.562537351854132,
+      "median_relative_error": 0.0044280380135652865,
+      "log_rmse": 0.04350987732688219
+    },
+    "mlp": {
+      "r2": 0.99986034402146,
+      "mae": 0.19104226864568258,
+      "max_error": 7.643070962591992,
+      "median_relative_error": 0.005091933223088024,
+      "log_rmse": 0.04391926339756984
+    }
+  },
+  "ensemble_sha256": "863a857203cea6fb4475911536ff3ed0e31c93b9b182ee90143a72a8300640ba",
+  "mlp_sha256": "53ed5dda16308af2f04b5b47d1a7f64d6beaeb53ea7d72b4ffb580f09371e7f7",
+  "reference_profile_max_error_eV": 3.2592834268517663,
+  "local_conformal": {
+    "alpha": 0.1,
+    "q_hat_log_chi": 0.026587015660833047,
+    "n_calibration": 3000,
+    "n_test": 3000,
+    "test_coverage": 0.8943333333333333,
+    "mean_interval_width": 1.1881673208152854,
+    "test_metrics": {
+      "r2": 0.9999091126203264,
+      "mae": 0.15849761004920526,
+      "max_error": 5.562537351854132,
+      "median_relative_error": 0.0044280380135652865,
+      "log_rmse": 0.04350987732688219
+    },
+    "assumption": "IID inputs from the declared uniform closure-parameter box",
+    "temperature_coverage_claim": false,
+    "artifact_sha256": "863a857203cea6fb4475911536ff3ed0e31c93b9b182ee90143a72a8300640ba",
+    "test_sha256": "567c9cacf600587dfea39269be24a6e2432523bab19869f5d0e067ae2c460873"
+  },
+  "profile_conformal": {
+    "target": "simultaneous_Te_Ti_max_abs_eV",
+    "alpha": 0.1,
+    "q_hat_eV": 16.25072632858155,
+    "test_simultaneous_coverage": 0.90625,
+    "n_calibration": 64,
+    "n_test": 64,
+    "family": {
+      "source_e": [
+        300.0,
+        1000.0
+      ],
+      "te_ped": [
+        300.0,
+        700.0
+      ],
+      "ti_ped_ratio": 0.8,
+      "n_rho": 40,
+      "rho_dep": 0.3,
+      "sigma": 0.1,
+      "density": 1.0,
+      "tau_eq": 1.0,
+      "transport_e": {
+        "chi_s": 1.0,
+        "a_over_LTe_crit": 3.0,
+        "alpha_s": 1.5,
+        "chi_neo": 0.01
+      },
+      "transport_i": {
+        "chi_s": 0.5,
+        "a_over_LTe_crit": 3.5,
+        "alpha_s": 1.5,
+        "chi_neo": 0.01
+      }
+    },
+    "artifact_sha256": "863a857203cea6fb4475911536ff3ed0e31c93b9b182ee90143a72a8300640ba",
+    "seeds": {
+      "calibration": 701,
+      "test": 702
+    },
+    "test_max_profile_error_eV": 24.196937918847198,
+    "test_median_profile_error_eV": 2.5897720498785475,
+    "scope": "Marginal over independent uniform draws of source and pedestal in the specified synthetic family; fixed grid; no device or conditional coverage claim"
+  },
+  "scope": "Synthetic closure emulation and numerical verification; no experimental plasma validation"
+}
