@@ -1,53 +1,19 @@
-"""Coupled Te–Ti Picard iteration with electron-ion equilibration.
-
-Extends the single-channel Picard loop to solve a two-channel system:
-
-    ∂Te/∂t = (1/V') ∂/∂ρ [V' χ_e ∂Te/∂ρ] + Se − S_ei
-    ∂Ti/∂t = (1/V') ∂/∂ρ [V' χ_i ∂Ti/∂ρ] + Si + S_ei
-
-where the electron-ion equilibration source is:
-
-    S_ei = (3/2) n (Te − Ti) / τ_eq
-
-At each Picard iteration the coupling term is evaluated using the
-*previous* profiles (lagged coupling), which is natural for fixed-point
-iteration and converges reliably when under-relaxed.
-"""
+"""Stationary coupled temperatures with fully implicit exchange."""
 
 from __future__ import annotations
 
-import logging
-import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
-from tokamak_transport_lab.integration.convergence import (
-    is_converged,
-    relative_l2_residual,
-)
-from tokamak_transport_lab.integration.picard import (
-    TransportModel,
-    _compute_a_over_lte,
-    _solver_step,
-)
-from tokamak_transport_lab.integration.relaxation import mix_profiles, update_alpha
-from tokamak_transport_lab.integration.safeguards import has_nonfinite
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-logger = logging.getLogger(__name__)
-
-
-# ── result container ─────────────────────────────────────────────
+from tokamak_transport_lab.integration.nonlinear import iterate
+from tokamak_transport_lab.integration.picard import TransportModel
 
 
 @dataclass
 class MultichannelResult:
-    """Container for coupled Te–Ti Picard iteration output."""
-
     rho: NDArray[np.float64]
     te_final: NDArray[np.float64]
     ti_final: NDArray[np.float64]
@@ -58,41 +24,11 @@ class MultichannelResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-# ── equilibration source ─────────────────────────────────────────
-
-
-def equilibration_source(
-    te: NDArray[np.float64],
-    ti: NDArray[np.float64],
-    *,
-    density: float = 1.0,
-    tau_eq: float = 0.01,
-) -> NDArray[np.float64]:
-    """Compute S_ei = (3/2) n (Te − Ti) / τ_eq.
-
-    This is positive when Te > Ti (energy flows from electrons to ions).
-
-    Parameters
-    ----------
-    te, ti : array (N,)
-        Electron / ion temperature profiles [eV].
-    density : float
-        Plasma density in units consistent with the source term.
-        In these normalised units a value of 1.0 works with ``tau_eq``
-        controlling the coupling strength.
-    tau_eq : float
-        Electron-ion equilibration time.  Smaller → stronger coupling.
-
-    Returns
-    -------
-    S_ei : array (N,)
-        Exchange power density.  Positive means electrons lose energy
-        to ions.
-    """
-    return 1.5 * density * (te - ti) / tau_eq
-
-
-# ── main entry point ─────────────────────────────────────────────
+def equilibration_source(te, ti, *, density=1.0, tau_eq=0.01):
+    """Normalized exchange rate; see docs/physics.md for its convention."""
+    if not np.isfinite(density) or density < 0 or not np.isfinite(tau_eq) or tau_eq <= 0:
+        raise ValueError("density must be nonnegative and tau_eq strictly positive")
+    return 1.5 * density * (np.asarray(te) - np.asarray(ti)) / tau_eq
 
 
 def run_picard_multichannel(
@@ -134,259 +70,42 @@ def run_picard_multichannel(
     te_init: NDArray[np.float64] | None = None,
     ti_init: NDArray[np.float64] | None = None,
 ) -> MultichannelResult:
-    """Run coupled Te–Ti Picard iteration.
+    """Solve both stationary equations together, including exchange.
 
-    Parameters
-    ----------
-    n_rho : int
-        Number of radial grid points.
-    te_ped, ti_ped : float
-        Pedestal temperatures at ρ = 1 for electrons / ions [eV].
-    s0_e, s0_i : float
-        Gaussian source amplitudes for electrons / ions.
-    rho_dep, sigma : float
-        Source deposition centre and width.
-    density : float
-        Plasma density (normalised units).
-    tau_eq : float
-        Electron-ion equilibration time.
-    v_prime_fn : callable, optional
-        Geometry function returning V'(ρ).
-    transport_model_e, transport_model_i : callable, optional
-        Transport models for electron / ion channels.
-    transport_params_e, transport_params_i : dict, optional
-        Parameters forwarded to each transport model.
-    fallback_model, fallback_params : callable / dict, optional
-        Analytic fallback when the primary model fails.
-    dt, theta, sub_steps : float / int
-        CN solver parameters.
-    max_iters : int
-        Maximum Picard iterations.
-    tol : float
-        Convergence tolerance on the max of both channel residuals.
-    alpha0, alpha_min, alpha_max : float
-        Under-relaxation schedule.
-    divergence_patience : int
-        Consecutive residual increases before fallback.
-    te_init, ti_init : array, optional
-        Initial temperature profiles.
-
-    Returns
-    -------
-    MultichannelResult
-        Contains rho, te_final, ti_final, chi profiles, histories,
-        and metadata.
+    Legacy dt/theta/sub_steps/divergence_patience arguments do not affect this
+    stationary solve. No temperature clipping or implicit change of closure.
     """
-    from tokamak_transport_lab.geometry.circular import v_prime as circ_vprime
+    from tokamak_transport_lab.geometry.circular import v_prime
     from tokamak_transport_lab.physics.sources import gaussian_source
-    from tokamak_transport_lab.transport.stiffness import chi_total as default_chi
+    from tokamak_transport_lab.transport.stiffness import chi_total
 
-    t_start = time.perf_counter()
-
-    # ── defaults ─────────────────────────────────────────────────
-    rho = np.linspace(0.0, 1.0, n_rho)
-    source_e = gaussian_source(rho, s0=s0_e, rho_dep=rho_dep, sigma=sigma)
-    source_i = gaussian_source(rho, s0=s0_i, rho_dep=rho_dep, sigma=sigma)
-
-    vp = circ_vprime(rho) if v_prime_fn is None else v_prime_fn(rho)
-
-    if transport_model_e is None:
-        transport_model_e = default_chi
-    if transport_params_e is None:
-        transport_params_e = {}
-    if transport_model_i is None:
-        transport_model_i = default_chi
-    if transport_params_i is None:
-        transport_params_i = {}
-    if fallback_model is None:
-        fallback_model = default_chi
-    if fallback_params is None:
-        fallback_params = dict(transport_params_e)
-
-    if te_init is not None:
-        te = np.array(te_init, dtype=np.float64, copy=True)
-    else:
-        te = np.linspace(te_ped + 500.0, te_ped, n_rho)
-
-    if ti_init is not None:
-        ti = np.array(ti_init, dtype=np.float64, copy=True)
-    else:
-        ti = np.linspace(ti_ped + 300.0, ti_ped, n_rho)
-
-    # ── iteration state ──────────────────────────────────────────
-    alpha = alpha0
-    residual_prev: float | None = None
-    divergence_counter = 0
-    converged = False
-    used_fallback = False
-    residual_history: list[float] = []
-    alpha_history: list[float] = []
-    chi_e = np.full(n_rho, 0.01)
-    chi_i = np.full(n_rho, 0.01)
-
-    for iteration in range(1, max_iters + 1):
-        # 1. Compute normalised gradients for each channel
-        a_over_lte = _compute_a_over_lte(te, rho)
-        a_over_lti = _compute_a_over_lte(ti, rho)  # same formula, different profile
-
-        # 2. Evaluate transport models → chi_e(ρ) and chi_i(ρ)
-        try:
-            chi_e_new = np.asarray(
-                transport_model_e(a_over_lte, **transport_params_e),
-                dtype=np.float64,
-            )
-        except Exception:
-            logger.warning("Iter %d: electron transport raised — fallback.", iteration)
-            chi_e_new = np.asarray(fallback_model(a_over_lte, **fallback_params), dtype=np.float64)
-            used_fallback = True
-
-        try:
-            chi_i_new = np.asarray(
-                transport_model_i(a_over_lti, **transport_params_i),
-                dtype=np.float64,
-            )
-        except Exception:
-            logger.warning("Iter %d: ion transport raised — fallback.", iteration)
-            chi_i_new = np.asarray(fallback_model(a_over_lti, **fallback_params), dtype=np.float64)
-            used_fallback = True
-
-        # 3. NaN/Inf guard
-        if has_nonfinite(chi_e_new):
-            logger.warning("Iter %d: chi_e NaN/Inf — fallback.", iteration)
-            chi_e_new = np.asarray(fallback_model(a_over_lte, **fallback_params), dtype=np.float64)
-            used_fallback = True
-        if has_nonfinite(chi_i_new):
-            logger.warning("Iter %d: chi_i NaN/Inf — fallback.", iteration)
-            chi_i_new = np.asarray(fallback_model(a_over_lti, **fallback_params), dtype=np.float64)
-            used_fallback = True
-
-        chi_e = np.clip(chi_e_new, 1e-6, 100.0)
-        chi_i = np.clip(chi_i_new, 1e-6, 100.0)
-
-        # 4. Compute coupling term (lagged: uses current Te, Ti)
-        s_ei = equilibration_source(te, ti, density=density, tau_eq=tau_eq)
-
-        # 5. Solve electron channel: Se − S_ei (electrons lose energy)
-        source_e_eff = source_e - s_ei
-        te_new = _solver_step(te, rho, chi_e, vp, source_e_eff, te_ped, dt, theta, sub_steps)
-
-        # 6. Solve ion channel: Si + S_ei (ions gain energy)
-        source_i_eff = source_i + s_ei
-        ti_new = _solver_step(ti, rho, chi_i, vp, source_i_eff, ti_ped, dt, theta, sub_steps)
-
-        # Guard: NaN / Inf from solver → abort early
-        if has_nonfinite(te_new) or has_nonfinite(ti_new):
-            logger.warning("Iter %d: solver produced NaN/Inf — aborting.", iteration)
-            break
-
-        # Floor: temperatures must remain positive (min 10 eV)
-        te_new = np.maximum(te_new, 10.0)
-        ti_new = np.maximum(ti_new, 10.0)
-
-        # Cap: prevent runaway (max 50 keV)
-        _t_cap = 5.0e4
-        if float(te_new.max()) > _t_cap or float(ti_new.max()) > _t_cap:
-            logger.warning("Iter %d: T exceeds %.0e eV cap — clamping.", iteration, _t_cap)
-            te_new = np.minimum(te_new, _t_cap)
-            ti_new = np.minimum(ti_new, _t_cap)
-
-        # 7. Under-relax both channels
-        te_mixed = np.asarray(mix_profiles(te, te_new, alpha), dtype=np.float64)
-        ti_mixed = np.asarray(mix_profiles(ti, ti_new, alpha), dtype=np.float64)
-
-        # Hard-enforce Dirichlet BC (prevents edge kink from mixing)
-        te_mixed[-1] = te_ped
-        ti_mixed[-1] = ti_ped
-
-        # 8. Combined residual = max of both channel residuals
-        res_te = relative_l2_residual(te_mixed, te)
-        res_ti = relative_l2_residual(ti_mixed, ti)
-        residual = max(res_te, res_ti)
-
-        # 9. Adapt alpha
-        alpha = update_alpha(
-            alpha,
-            residual,
-            residual_prev,
-            alpha_min=alpha_min,
-            alpha_max=alpha_max,
-        )
-
-        residual_history.append(residual)
-        alpha_history.append(alpha)
-
-        # 10. Divergence tracking
-        if residual_prev is not None and residual >= residual_prev:
-            divergence_counter += 1
-        else:
-            divergence_counter = 0
-
-        if not used_fallback and divergence_counter >= divergence_patience:
-            logger.warning(
-                "Iter %d: divergence patience exhausted — permanent fallback.",
-                iteration,
-            )
-            transport_model_e = fallback_model
-            transport_params_e = dict(fallback_params)
-            transport_model_i = fallback_model
-            transport_params_i = dict(fallback_params)
-            used_fallback = True
-            divergence_counter = 0
-
-        # 10b. No-progress early stop: if residual hasn't improved
-        # by at least 5% over the last 10 iterations, stop early.
-        _stall_window = 10
-        if len(residual_history) >= _stall_window:
-            old_res = residual_history[-_stall_window]
-            if residual >= old_res * 0.95:
-                logger.info(
-                    "Iter %d: no progress over last %d iters (%.2e → %.2e) — stopping.",
-                    iteration,
-                    _stall_window,
-                    old_res,
-                    residual,
-                )
-                te = te_mixed
-                ti = ti_mixed
-                break
-
-        # 11. Convergence check
-        if is_converged(residual, tol):
-            converged = True
-            te = te_mixed
-            ti = ti_mixed
-            logger.info(
-                "Multichannel Picard converged at iter %d (res=%.2e).",
-                iteration,
-                residual,
-            )
-            break
-
-        residual_prev = residual
-        te = te_mixed
-        ti = ti_mixed
-
-    wall_time = time.perf_counter() - t_start
-
-    # Final BC enforcement before returning
-    te[-1] = te_ped
-    ti[-1] = ti_ped
-
-    return MultichannelResult(
+    exchange = float(equilibration_source(1.0, 0.0, density=density, tau_eq=tau_eq))
+    rho = np.linspace(0, 1, n_rho)
+    sources = [gaussian_source(rho, s0=s, rho_dep=rho_dep, sigma=sigma) for s in (s0_e, s0_i)]
+    vp = (v_prime_fn or v_prime)(rho)
+    initial = [
+        te_init if te_init is not None else te_ped + 500 * (1 - rho * rho),
+        ti_init if ti_init is not None else ti_ped + 300 * (1 - rho * rho),
+    ]
+    models = [transport_model_e or chi_total, transport_model_i or chi_total]
+    params = [transport_params_e or {}, transport_params_i or {}]
+    fallbacks = [fallback_params if fallback_params is not None else p for p in params]
+    t, chi, res, alpha, meta = iterate(
         rho=rho,
-        te_final=te,
-        ti_final=ti,
-        chi_e_profile=chi_e,
-        chi_i_profile=chi_i,
-        residual_history=residual_history,
-        alpha_history=alpha_history,
-        metadata={
-            "n_iters": len(residual_history),
-            "converged": converged,
-            "used_fallback": used_fallback,
-            "wall_time_s": wall_time,
-            "final_residual": (residual_history[-1] if residual_history else float("nan")),
-            "te_core_eV": float(te[0]),
-            "ti_core_eV": float(ti[0]),
-        },
+        sources=sources,
+        pedestals=[te_ped, ti_ped],
+        vp=vp,
+        initial=initial,
+        models=models,
+        params=params,
+        fallback_model=fallback_model,
+        fallback_params=fallbacks,
+        exchange=exchange,
+        max_iters=max_iters,
+        tol=tol,
+        alpha0=alpha0,
+        alpha_min=alpha_min,
+        alpha_max=alpha_max,
     )
+    meta.update(te_core_eV=float(t[0, 0]), ti_core_eV=float(t[1, 0]))
+    return MultichannelResult(rho, t[0], t[1], chi[0], chi[1], res, alpha, meta)

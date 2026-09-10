@@ -1,14 +1,8 @@
-"""Miller-parameterised flux-surface geometry.
+"""Legacy constant-volume rescaling retained for old configuration files.
 
-Provides an effective volume-element derivative V'(rho) that depends on
-elongation kappa and triangularity delta.  In the limit
-kappa = 1, delta = 0 the result recovers the circular expression
-V'(rho) = rho.
-
-This is a *minimal* Miller model sufficient to exercise the pipeline.
-The full Miller parameterisation involves solving a Grad-Shafranov-like
-system for the metric coefficients; here we use the lowest-order analytic
-approximation.
+This is NOT Miller geometry: kappa*(1+delta**2/2) is constant and cancels
+from the diffusion operator. It has no effect on temperatures. The supported
+physical scope of the current model is circular radial diffusion.
 """
 
 from __future__ import annotations
@@ -27,31 +21,9 @@ def vprime_miller(
     kappa: float = 1.0,
     delta: float = 0.0,
 ) -> NDArray[np.float64]:
-    r"""Effective volume-element derivative for shaped flux surfaces.
-
-    Uses the lowest-order approximation:
-
-    .. math::
-        V'(\rho) \approx \kappa\,(1 + 0.5\,\delta^2)\;\rho
-
-    This gives the correct circular limit ($\kappa=1, \delta=0 \Rightarrow
-    V'= \rho$) and captures the leading shaping effects: elongation scales
-    the cross-section area while triangularity enters at second order.
-
-    Parameters
-    ----------
-    rho : array (N,)
-        Normalised radial coordinate.
-    kappa : float
-        Elongation ($\kappa \ge 1$).
-    delta : float
-        Triangularity ($0 \le \delta \le 0.5$ typical).
-
-    Returns
-    -------
-    vp : array (N,)
-        $V'(\rho)$ in the same units as the input grid.
-    """
+    """Return the historical constant rescaling; this adds no shaping physics."""
+    if not np.isfinite([kappa, delta]).all() or kappa <= 0:
+        raise ValueError("Legacy geometry parameters must be finite with kappa > 0")
     rho = np.asarray(rho, dtype=np.float64)
     shape_factor = kappa * (1.0 + 0.5 * delta**2)
     return shape_factor * rho

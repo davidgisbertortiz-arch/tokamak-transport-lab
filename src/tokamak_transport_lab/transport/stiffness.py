@@ -47,6 +47,18 @@ def chi_turbulent(
         Turbulent diffusivity (same shape as *a_over_LTe*).
     """
     a_over_LTe = np.asarray(a_over_LTe, dtype=np.float64)
+    if (
+        not np.isfinite(a_over_LTe).all()
+        or not np.isfinite(chi_s).all()
+        or not np.isfinite(a_over_LTe_crit).all()
+        or not np.isfinite(alpha_s).all()
+        or np.any(np.asarray(chi_s) < 0)
+        or np.any(np.asarray(a_over_LTe_crit) < 0)
+        or np.any(np.asarray(alpha_s) <= 0)
+    ):
+        raise ValueError(
+            "Closure parameters must be finite; stiffness/threshold nonnegative and exponent positive"
+        )
     margin = np.maximum(0.0, a_over_LTe - a_over_LTe_crit)
     return chi_s * margin**alpha_s
 
@@ -68,13 +80,15 @@ def chi_total(
     chi_s, a_over_LTe_crit, alpha_s :
         Stiffness model parameters (see :func:`chi_turbulent`).
     chi_neo : float
-        Neoclassical floor diffusivity [m²/s].
+        Prescribed normalized diffusivity floor (not a neoclassical calculation).
 
     Returns
     -------
     chi : ndarray
         Total diffusivity (same shape as *a_over_LTe*).
     """
+    if not np.isfinite(chi_neo).all() or np.any(np.asarray(chi_neo) <= 0):
+        raise ValueError("The normalized diffusivity floor must be strictly positive")
     return (
         chi_turbulent(
             a_over_LTe,
@@ -94,10 +108,10 @@ def normalised_flux(
     alpha_s: float = 1.5,
     chi_neo: float = 0.01,
 ) -> NDArray[np.float64]:
-    """Normalised heat flux Qe/Q_gB = chi_total · (a/L_Te).
+    """Algebraic flux proxy chi * (a/L_T), retained as an educational helper.
 
-    This is the quantity the ML surrogate learns to predict.  The gyroBohm
-    normalisation factor chi_gB cancels when we work in these units.
+    This is not a gyroBohm normalization. The current surrogate learns chi
+    directly; temperature factors and dimensional energy flux are absent.
     """
     a_over_LTe = np.asarray(a_over_LTe, dtype=np.float64)
     chi = chi_total(

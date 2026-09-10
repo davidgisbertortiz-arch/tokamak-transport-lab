@@ -41,4 +41,6 @@ def gaussian_source(
     S : array (N,)
         Source profile on *rho*.
     """
+    if not np.isfinite([s0, rho_dep, sigma]).all() or sigma <= 0 or not 0 <= rho_dep <= 1:
+        raise ValueError("Source parameters must be finite with sigma > 0 and rho_dep in [0, 1]")
     return s0 * np.exp(-((rho - rho_dep) ** 2) / (2.0 * sigma**2))

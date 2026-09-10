@@ -1,11 +1,4 @@
-"""Run the 1-D solver with a YAML config (placeholder for Week 1).
-
-Usage
------
-    python -m scripts.run_solver --config configs/solver.yaml
-
-For now this is a minimal placeholder. Full CLI comes with Week 2+.
-"""
+"""Run transient diffusion, save output, and report stationary balance."""
 
 from __future__ import annotations
 
@@ -59,7 +52,11 @@ def main() -> None:
         chi=result["chi"],
         source=result["source"],
         residual_history=result["residual_history"],
+        steady_residual=result["steady_residual"],
+        converged=result["converged"],
+        time=result["time"],
     )
+    print(f"Stationary: {result['converged']}; PDE residual: {result['steady_residual']:.3e}")
     print(f"Saved results to {out_dir / 'solver_verification.npz'}")
 
 
