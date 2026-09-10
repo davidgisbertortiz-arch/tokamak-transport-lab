@@ -1,39 +1,26 @@
-# Picard iteration loop configuration
-
+# Stationary single-channel example; solver time controls are unnecessary.
 picard:
-  max_iters: 50
-  tol: 1.0e-4
-  alpha0: 0.5           # initial under-relaxation
+  max_iters: 80
+  tol: 1.0e-06
+  alpha0: 0.5
   alpha_min: 0.05
   alpha_max: 1.0
   divergence_patience: 5
-
 grid:
   n_rho: 100
-
-solver:
-  dt: 1.0e-4
-  theta: 0.5            # Crank-Nicolson
-  sub_steps: 500        # CN sub-steps per Picard iteration
-
 source:
   S0: 1.0
   rho_dep: 0.3
   sigma: 0.1
-
 bc:
   Te_ped: 500.0
-
 transport:
-  model: "stiffness"    # "stiffness" (analytic) or "surrogate"
+  model: stiffness
   chi_s: 1.0
   a_over_LTe_crit: 3.0
   alpha_s: 1.5
   chi_neo: 0.01
-
-geometry: circular       # "circular" or "miller"
-miller:
-  kappa: 1.0
-  delta: 0.0
-
-output_dir: "outputs/picard"
+geometry: circular
+output_dir: outputs/picard
+model:
+  type: analytic

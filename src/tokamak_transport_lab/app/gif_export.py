@@ -1,27 +1,8 @@
-"""Headless GIF generation for README — no Streamlit required.
-
-Generates portfolio-grade animated frames showing a P_heat sweep
-dashboard, then stitches them into a GIF via ``imageio``.
-
-Each frame is a **3-panel + footer** dashboard:
-
-* **Top-left (big)** — Te(ρ) and Ti(ρ) profiles.  Previous sweep
-  profiles shown as faint "ghost" lines; current frame is bold.
-* **Top-right upper** — Convergence: residual vs iteration (log scale).
-* **Top-right lower** — χ profiles: χ_turb + χ_neo decomposition.
-* **Footer strip** — compact metadata (P_heat, Te₀, residual, iters, converged).
-
-Usage::
-
-    python -m scripts.make_readme_gif
-    python -m scripts.make_readme_gif --n_frames 15
-    python -m scripts.make_readme_gif --param P_heat --start 1 --end 80 --n_frames 15
-"""
+"""Headless rendering of verified synthetic stationary heating sweeps."""
 
 from __future__ import annotations
 
 import pathlib
-from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,27 +10,7 @@ from matplotlib.ticker import ScalarFormatter
 
 from tokamak_transport_lab.integration.multichannel_picard import (
     MultichannelResult,
-    run_picard_multichannel,
 )
-from tokamak_transport_lab.integration.picard import _compute_a_over_lte
-from tokamak_transport_lab.transport.stiffness import chi_total, chi_turbulent
-
-# ── defaults ─────────────────────────────────────────────────────
-
-# Demo transport tuned for a visually interesting GIF:
-#   • Low chi_neo (0.02) → profiles must steepen before diffusion
-#     balances the source, producing peaked Te(ρ).
-#   • Low critical gradient (0.08) → turbulence activates easily
-#     once profiles develop any significant slope.
-#   • High chi_s (3.0) → large visible turbulent bump in the χ panel
-#     that grows dramatically with P_heat.
-#   • alpha_s=1.0 (linear) → smooth, proportional χ_turb response.
-_TRANSPORT_PARAMS: dict[str, float] = {
-    "chi_s": 3.0,
-    "a_over_LTe_crit": 0.08,
-    "alpha_s": 1.0,
-    "chi_neo": 0.02,
-}
 
 # ── dark style setup ────────────────────────────────────────────
 
@@ -63,104 +24,6 @@ _TI_COLOR = "#ff8a65"  # warm coral
 _CHI_TURB_COLOR = "#81c784"  # green
 _CHI_NEO_COLOR = "#ffb74d"  # amber
 _ACCENT = "#e53935"  # red accent marker
-
-
-# ── power-normalized source ─────────────────────────────────────
-
-
-def _power_to_s0(
-    p_heat: float,
-    rho: np.ndarray,
-    rho_dep: float = 0.3,
-    sigma: float = 0.1,
-) -> float:
-    """Convert total heating power *P_heat* to Gaussian source amplitude *S0*.
-
-    Solves  P_heat = ∫₀¹ S₀·exp(…) · V'(ρ) dρ  for S₀, where V'=ρ.
-    """
-    gauss = np.exp(-((rho - rho_dep) ** 2) / (2.0 * sigma**2))
-    vprime = np.copy(rho)
-    vprime[0] = max(vprime[0], 1e-30)
-    norm = float(np.trapz(gauss * vprime, rho))
-    return p_heat / max(norm, 1e-10)
-
-
-# ── single run helper ───────────────────────────────────────────
-
-
-def _run_for_gif(
-    *,
-    p_heat: float | None = None,
-    s0_e: float = 1.0,
-    te_ped: float = 250.0,
-    ti_ped: float = 200.0,
-    density: float = 0.2,
-    tau_eq: float = 0.5,
-    chi_s: float | None = None,
-    a_over_LTe_crit: float | None = None,
-    alpha_s: float | None = None,
-    chi_neo: float | None = None,
-    n_rho: int = 50,
-    max_iters: int = 80,
-    tol: float = 1e-3,
-) -> MultichannelResult:
-    """Lightweight run for GIF frames.
-
-    If *p_heat* is given it is converted to *s0_e* via power
-    normalisation (preferred).  Otherwise *s0_e* is used directly.
-
-    Key design choices for demo stability:
-    * Flat initial profiles at pedestal temperature — the solver
-      *builds up* from T_ped instead of trying to diffuse a steep
-      initial guess (which causes transient blow-up).
-    * Weak equilibration (``tau_eq=0.5``) and low density (0.2) so
-      the coupling source S_ei stays small.
-    * CN step sized for convergence: ``dt=1e-3, sub_steps=300``
-      (dt·sub_steps=0.3 per Picard iteration, ~12× τ_diff in 60 iters).
-    """
-    rho = np.linspace(0.0, 1.0, n_rho)
-
-    # Power-normalised source amplitude
-    if p_heat is not None:
-        s0_e = _power_to_s0(p_heat, rho)
-
-    params_e = {
-        "chi_s": chi_s if chi_s is not None else _TRANSPORT_PARAMS["chi_s"],
-        "a_over_LTe_crit": (
-            a_over_LTe_crit
-            if a_over_LTe_crit is not None
-            else _TRANSPORT_PARAMS["a_over_LTe_crit"]
-        ),
-        "alpha_s": alpha_s if alpha_s is not None else _TRANSPORT_PARAMS["alpha_s"],
-        "chi_neo": chi_neo if chi_neo is not None else _TRANSPORT_PARAMS["chi_neo"],
-    }
-    params_i = {**params_e, "chi_s": params_e["chi_s"] * 0.5}
-
-    # Start from flat profiles at pedestal T → solver builds up,
-    # no overshoot from steep initial gradients.
-    te_init = np.full(n_rho, te_ped)
-    ti_init = np.full(n_rho, ti_ped)
-
-    return run_picard_multichannel(
-        n_rho=n_rho,
-        te_ped=te_ped,
-        ti_ped=ti_ped,
-        s0_e=s0_e,
-        s0_i=0.0,
-        density=density,
-        tau_eq=tau_eq,
-        transport_model_e=chi_total,
-        transport_params_e=params_e,
-        transport_model_i=chi_total,
-        transport_params_i=params_i,
-        dt=1e-3,
-        sub_steps=300,
-        max_iters=max_iters,
-        tol=tol,
-        alpha0=0.5,
-        te_init=te_init,
-        ti_init=ti_init,
-    )
 
 
 # ── frame rendering ─────────────────────────────────────────────
@@ -263,9 +126,7 @@ def render_frame(
                 color=_TE_COLOR,
                 lw=1.5,
             )
-            tol_val = result.metadata.get("tol", 5e-4)
-            if isinstance(tol_val, str):
-                tol_val = 5e-4
+            tol_val = result.metadata["tol"]
             ax_conv.axhline(
                 tol_val,
                 color=_ACCENT,
@@ -273,24 +134,13 @@ def render_frame(
                 lw=1,
                 alpha=0.8,
             )
-        ax_conv.set_xlabel("Picard iteration", fontsize=8.5)
-        ax_conv.set_ylabel("Residual", fontsize=8.5)
+        ax_conv.set_xlabel("Nonlinear iteration", fontsize=8.5)
+        ax_conv.set_ylabel("PDE residual", fontsize=8.5)
         ax_conv.set_title("Convergence")
 
         # ── Panel 3: χ profiles ──────────────────────────────────
         rho = result.rho
-        a_over_lte = _compute_a_over_lte(result.te_final, rho)
-        p = _TRANSPORT_PARAMS
-        chi_turb = chi_turbulent(
-            a_over_lte,
-            chi_s=p["chi_s"],
-            a_over_LTe_crit=p["a_over_LTe_crit"],
-            alpha_s=p["alpha_s"],
-        )
-        chi_neo_arr = np.full_like(rho, p["chi_neo"])
-
-        ax_chi.plot(rho, chi_turb, color=_CHI_TURB_COLOR, lw=1.8, label="χ_turb")
-        ax_chi.plot(rho, chi_neo_arr, color=_CHI_NEO_COLOR, lw=1.3, ls="--", label="χ_neo")
+        ax_chi.plot(rho, result.chi_i_profile, color=_TI_COLOR, lw=1.5, label="χ_i total")
         ax_chi.plot(
             rho,
             result.chi_e_profile,
@@ -301,7 +151,7 @@ def render_frame(
             label="χ_e total",
         )
         ax_chi.set_xlabel("ρ", fontsize=8.5)
-        ax_chi.set_ylabel("Diffusivity χ", fontsize=8.5)
+        ax_chi.set_ylabel("Normalized diffusivity χ", fontsize=8.5)
         ax_chi.set_title("Transport profiles")
         ax_chi.legend(
             loc="upper right",
@@ -315,7 +165,7 @@ def render_frame(
 
         # ── Suptitle + frame counter ────────────────────────────
         fig.suptitle(
-            "tokamak-transport-lab  ·  P_heat sweep",
+            "tokamak-transport-lab  ·  normalized heating sweep",
             fontsize=13,
             fontweight="bold",
             color=_TEXT_COLOR,
@@ -400,123 +250,73 @@ def render_frame(
 
 def generate_gif(
     *,
-    param: str = "P_heat",
-    start: float = 2.0,
-    end: float = 120.0,
-    n_frames: int = 12,
-    out_path: str | pathlib.Path = "assets/demo.gif",
-    duration_s: float = 0.45,
-    base_kwargs: dict[str, Any] | None = None,
-) -> pathlib.Path:
-    """Run a parameter sweep headlessly and stitch frames into a GIF.
+    config=None,
+    param="S0_e",
+    start=300.0,
+    end=1000.0,
+    n_frames=8,
+    out_path="assets/demo.gif",
+    duration_s=0.6,
+):
+    """Solve a complete configuration at every sweep point and render it.
 
-    Parameters
-    ----------
-    param : str
-        Parameter to sweep.  One of ``P_heat``, ``S0_e``, ``te_ped``,
-        ``ti_ped``, ``density``, ``tau_eq``.
-    start, end : float
-        Sweep range.  Default 1.0 → 15.0 for ``P_heat`` produces
-        clearly distinct profiles.
-    n_frames : int
-        Number of frames (default 12).
-    out_path : str or Path
-        Destination file.
-    duration_s : float
-        Seconds per frame (default 0.45).
-    base_kwargs : dict, optional
-        Override default run parameters (from YAML config).
-
-    Returns
-    -------
-    pathlib.Path
-        Path to the generated GIF.
+    Every frame must converge. Save the inputs and metrics alongside the GIF.
     """
-    try:
-        import imageio.v3 as iio
-    except ImportError as exc:
-        msg = "imageio is required for GIF generation.  Install with:  pip install -e '.[gif]'"
-        raise ImportError(msg) from exc
+    import json
+    from copy import deepcopy
 
-    values = np.linspace(start, end, n_frames)
+    import imageio.v3 as iio
 
-    # ── defaults (may be overridden by base_kwargs) ──────────────
-    # density & tau_eq are kept small so Te–Ti coupling doesn't
-    # overwhelm the profiles during the sweep.
-    defaults: dict[str, Any] = {
-        "p_heat": 10.0,
-        "s0_e": 1.0,
-        "te_ped": 250.0,
-        "ti_ped": 200.0,
-        "density": 0.2,
-        "tau_eq": 0.5,
+    from tokamak_transport_lab.integration.config import run_config
+    from tokamak_transport_lab.surrogate.profile_uq import family_config
+
+    if n_frames < 2 or duration_s <= 0:
+        raise ValueError("Need at least two frames and positive frame duration")
+    config = deepcopy(config if config is not None else family_config())
+    locations = {
+        "S0_e": ("source", "S0_e"),
+        "te_ped": ("bc", "Te_ped"),
+        "ti_ped": ("bc", "Ti_ped"),
+        "density": ("coupling", "density"),
+        "tau_eq": ("coupling", "tau_eq"),
     }
-    if base_kwargs is not None:
-        defaults.update(base_kwargs)
-
-    _param_key = {
-        "P_heat": "p_heat",
-        "S0_e": "s0_e",
-        "te_ped": "te_ped",
-        "ti_ped": "ti_ped",
-        "density": "density",
-        "tau_eq": "tau_eq",
-    }
-    run_key = _param_key.get(param, param)
-
-    # ── first pass: run all points ───────────────────────────────
-    all_results: list[tuple[float, MultichannelResult]] = []
-    te_max = 0.0
-    chi_max = 0.0
-    for i, val in enumerate(values):
-        kw = {**defaults, run_key: val}
-        print(f"  frame {i + 1}/{n_frames}  {param}={val:.3f} …", end="", flush=True)
-        res = _run_for_gif(**kw)
-        meta = res.metadata
+    if param not in locations:
+        raise ValueError(f"Unsupported sweep parameter: {param}")
+    section, key = locations[param]
+    all_results = []
+    runs = []
+    for value in np.linspace(start, end, n_frames):
+        cfg = deepcopy(config)
+        cfg.setdefault(section, {})[key] = float(value)
+        result = run_config(cfg)
+        if not result.metadata["converged"]:
+            raise RuntimeError(f"GIF point {value} did not converge: {result.metadata}")
+        all_results.append((float(value), result))
+        runs.append({"value": float(value), "config": cfg, "metrics": result.metadata})
         print(
-            f"  Te0={res.te_final[0]:.0f}  iters={meta.get('n_iters', '?')}"
-            f"  conv={meta.get('converged', '?')}"
+            f"{param}={value:.1f}: Te0={result.te_final[0]:.1f}, residual={result.metadata['final_residual']:.2e}",
+            flush=True,
         )
-        all_results.append((val, res))
-        te_max = max(te_max, float(res.te_final.max()))
-        chi_max = max(chi_max, float(res.chi_e_profile.max()))
-
-    te_ylim = (0.0, te_max * 1.15)
-    chi_ylim = (0.0, max(chi_max * 1.2, 0.05))
-
-    # ── summary ──────────────────────────────────────────────────
-    te0_vals = [r.te_final[0] for _, r in all_results]
-    n_conv = sum(1 for _, r in all_results if r.metadata.get("converged"))
-    print(
-        f"\n  ── sweep summary ──\n"
-        f"  converged: {n_conv}/{n_frames}    "
-        f"Te0 range: {min(te0_vals):.0f} – {max(te0_vals):.0f} eV\n"
-    )
-
-    # ── second pass: render frames ───────────────────────────────
-    frames: list[np.ndarray] = []
-    for idx, (val, res) in enumerate(all_results):
-        frame = render_frame(
-            res,
+    te_max = max(max(r.te_final.max(), r.ti_final.max()) for _, r in all_results)
+    chi_max = max(max(r.chi_e_profile.max(), r.chi_i_profile.max()) for _, r in all_results)
+    frames = [
+        render_frame(
+            r,
             param_name=param,
-            param_value=val,
-            te_ylim=te_ylim,
-            chi_ylim=chi_ylim,
+            param_value=value,
+            te_ylim=(0.0, 1.1 * te_max),
+            chi_ylim=(0.0, max(1.1 * chi_max, 0.02)),
             all_results=all_results,
-            current_idx=idx,
+            current_idx=i,
             total_frames=n_frames,
         )
-        frames.append(frame)
-
+        for i, (value, r) in enumerate(all_results)
+    ]
     out = pathlib.Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-
-    iio.imwrite(
-        out,
-        frames,
-        extension=".gif",
-        duration=int(duration_s * 1000),
-        loop=0,
-        quantize=True,
+    iio.imwrite(out, frames, extension=".gif", duration=int(duration_s * 1000), loop=0)
+    out.with_suffix(".json").write_text(
+        json.dumps({"description": "Normalized synthetic heating sweep", "runs": runs}, indent=2)
+        + "\n"
     )
     return out
