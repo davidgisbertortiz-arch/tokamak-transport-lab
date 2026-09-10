@@ -1,7 +1,7 @@
 """Split conformal prediction for regression.
 
-Provides distribution-free prediction intervals with guaranteed marginal
-coverage at any user-chosen miscoverage level alpha.  Accepts both numpy
+Provides distribution-free prediction intervals with marginal coverage under exchangeability of calibration and test scores.
+It gives no conditional or distribution-shift guarantee.  Accepts both numpy
 arrays and torch tensors as inputs.
 
 Algorithm (Vovk et al., Lei et al.):
@@ -80,14 +80,18 @@ class SplitConformal:
         -------
         self
         """
-        y_np = _to_numpy(y_cal)
-        yhat_np = _to_numpy(yhat_cal)
+        y_np = _to_numpy(y_cal).reshape(-1)
+        yhat_np = _to_numpy(yhat_cal).reshape(-1)
+        if not 0 < alpha < 1 or not len(y_np) or y_np.shape != yhat_np.shape:
+            raise ValueError("Need matching nonempty targets/predictions and 0 < alpha < 1")
+        if not np.isfinite(y_np).all() or not np.isfinite(yhat_np).all():
+            raise ValueError("Calibration values must be finite")
         scores = np.abs(y_np - yhat_np)
         n = len(scores)
-        # Finite-sample-valid quantile level
-        level = np.ceil((1 - alpha) * (n + 1)) / n
-        level = min(level, 1.0)
-        self.q_hat = float(np.quantile(scores, level))
+        rank = int(np.ceil((1 - alpha) * (n + 1)))
+        # Exact order statistic, including the necessary infinite interval
+        # when the requested coverage is unattainable with n observations.
+        self.q_hat = float(np.partition(scores, rank - 1)[rank - 1]) if rank <= n else float("inf")
         self.alpha = alpha
         return self
 
@@ -123,7 +127,16 @@ class SplitConformal:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
-            json.dump({"q_hat": self.q_hat, "alpha": self.alpha}, f, indent=2)
+            json.dump(
+                {
+                    "q_hat": None if self.q_hat == float("inf") else self.q_hat,
+                    "unbounded": self.q_hat == float("inf"),
+                    "alpha": self.alpha,
+                },
+                f,
+                indent=2,
+                allow_nan=False,
+            )
 
     @classmethod
     def load(cls, path: str | Path) -> SplitConformal:
@@ -131,7 +144,7 @@ class SplitConformal:
         with open(path) as f:
             data = json.load(f)
         obj = cls()
-        obj.q_hat = data["q_hat"]
+        obj.q_hat = float("inf") if data.get("unbounded") else data["q_hat"]
         obj.alpha = data["alpha"]
         return obj
 

@@ -1,4 +1,4 @@
-"""Transport model sub-package (stiffness, neoclassical, ion, normalizations)."""
+"""Transport model sub-package (critical-gradient closure and ion-channel adapters)."""
 
 from tokamak_transport_lab.transport.ion_transport import (
     ScaledQeTransport,

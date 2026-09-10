@@ -1,27 +1,9 @@
-"""Transport-model adapters for the Picard loop.
+"""Legacy adapters for standalone, unnormalized toy flux models.
 
-Provides a uniform ``(a_over_lte, **kwargs) → chi`` interface so the
-Picard iterator can call either:
-
-1. **Analytic** – wraps :func:`stiffness.chi_total` (no-op, it already
-   matches the expected signature).
-2. **Surrogate** – wraps a :class:`TransportMLP` (single or ensemble
-   mean), converting numpy ↔ torch internally.
-3. **SurrogateWithUQ** – like (2) but also stores conformal prediction
-   intervals after each call (not used for convergence, only for
-   post-hoc analysis).
-
-All adapters are lightweight, CPU-only, and carry no hidden state beyond
-the last UQ bands (option 3).
-
-Limitations
------------
-- The MLP predicts *normalised heat flux* Qe/Q_gB = chi · (a/L_Te);
-  the adapter inverts this to chi = Q_norm / a_over_lte, clamped to a
-  minimum of ``chi_floor`` to avoid division-by-zero in low-gradient
-  regions.
-- Ensemble uncertainty is the member standard-deviation of Q_norm,
-  *not* a calibrated chi uncertainty.
+These low-level helpers do not understand trained-artifact normalization.
+For version-2 project checkpoints use TransportBundle and BundleAdapter;
+the app and CLIs use those exclusively. Flux intervals here are local only
+and imply no calibrated temperature uncertainty.
 """
 
 from __future__ import annotations

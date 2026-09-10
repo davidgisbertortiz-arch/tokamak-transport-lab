@@ -1,102 +1,49 @@
-"""Generate synthetic transport datasets via LHS + stiffness model.
-
-Produces NPZ files with input features and output labels suitable for
-training / testing a transport surrogate.
-"""
+"""Synthetic diffusivity data with five causally active closure parameters."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import numpy as np
 
 from tokamak_transport_lab.data.lhs import latin_hypercube, scale_samples
-from tokamak_transport_lab.transport.stiffness import normalised_flux
+from tokamak_transport_lab.transport.stiffness import chi_total
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-# Default LHS sampling bounds for 6 input dimensions
-DEFAULT_BOUNDS: list[tuple[float, float]] = [
-    (0.5, 12.0),  # a/L_Te
-    (1.0, 5.0),  # q (safety factor)
-    (0.1, 3.0),  # s_hat (magnetic shear)
-    (0.01, 2.0),  # nu_star (collisionality)
-    (0.5, 5.0),  # chi_s (stiffness coefficient)
-    (2.0, 6.0),  # a/L_Te,crit (critical gradient)
-]
-
-FEATURE_NAMES: list[str] = [
-    "a_over_LTe",
-    "q",
-    "s_hat",
-    "nu_star",
-    "chi_s",
-    "a_over_LTe_crit",
-]
+FEATURE_NAMES = ["a_over_LTe", "chi_s", "a_over_LTe_crit", "alpha_s", "chi_neo"]
+DEFAULT_BOUNDS = [(0.0, 12.0), (0.1, 5.0), (1.0, 6.0), (1.0, 2.0), (0.001, 0.1)]
 
 
-def generate_dataset(
-    n_samples: int,
-    *,
-    bounds: list[tuple[float, float]] | None = None,
-    alpha_s: float = 1.5,
-    chi_neo: float = 0.01,
-    seed: int = 42,
-) -> dict[str, np.ndarray]:
-    """Generate a synthetic transport dataset.
+def generate_dataset(n_samples, *, bounds=None, seed=42, sampling="lhs"):
+    """Sample the analytic closure; y is normalized chi, never device flux.
 
-    Parameters
-    ----------
-    n_samples : int
-        Number of data points.
-    bounds : list of (lo, hi), optional
-        Per-dimension bounds.  Defaults to :data:`DEFAULT_BOUNDS`.
-    alpha_s : float
-        Stiffness exponent (held fixed, not sampled).
-    chi_neo : float
-        Neoclassical floor diffusivity.
-    seed : int
-        Random seed for reproducibility.
-
-    Returns
-    -------
-    data : dict
-        ``"X"`` — input features ``(n_samples, 6)``
-        ``"y"`` — normalised flux ``Qe/Q_gB`` ``(n_samples,)``
-        ``"feature_names"`` — list of 6 strings
+    Use iid sampling for conformal calibration/test exchangeability. LHS is
+    useful for training but is not an exchangeable iid calibration design.
     """
-    if bounds is None:
-        bounds = DEFAULT_BOUNDS
-
+    bounds = np.asarray(DEFAULT_BOUNDS if bounds is None else bounds, dtype=float)
+    if n_samples < 1 or bounds.shape != (5, 2) or np.any(bounds[:, 1] <= bounds[:, 0]):
+        raise ValueError("Need positive sample count and five ordered nondegenerate bounds")
     rng = np.random.default_rng(seed)
-    unit = latin_hypercube(n_samples, len(bounds), rng=rng)
-    X = scale_samples(unit, bounds)
-
-    # Evaluate stiffness model for each sample
-    a_over_LTe = X[:, 0]
-    chi_s = X[:, 4]
-    a_over_LTe_crit = X[:, 5]
-
-    y = normalised_flux(
-        a_over_LTe,
-        chi_s=chi_s,
-        a_over_LTe_crit=a_over_LTe_crit,
-        alpha_s=alpha_s,
-        chi_neo=chi_neo,
-    )
-
+    if sampling == "lhs":
+        unit = latin_hypercube(n_samples, 5, rng=rng)
+    elif sampling == "iid":
+        unit = rng.random((n_samples, 5))
+    else:
+        raise ValueError("sampling must be lhs or iid")
+    x = scale_samples(unit, bounds)
+    y = chi_total(x[:, 0], **{name: x[:, i] for i, name in enumerate(FEATURE_NAMES) if i})
     return {
-        "X": X,
+        "X": x,
         "y": y,
         "feature_names": np.array(FEATURE_NAMES),
+        "bounds": bounds,
+        "target": np.array("chi"),
+        "seed": np.array(seed),
+        "sampling": np.array(sampling),
+        "schema_version": np.array(2),
     }
 
 
-def save_dataset(data: dict[str, np.ndarray], path: Path | str) -> None:
-    """Save a dataset dict to compressed NPZ."""
-    from pathlib import Path as _P
-
-    path = _P(path)
+def save_dataset(data, path):
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(path, **data)
