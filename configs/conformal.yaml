@@ -1,0 +1,8 @@
+conformal:
+  alpha: 0.1
+data:
+  calibration: data/transport_calibration.npz
+  test: data/transport_test.npz
+model:
+  path: outputs/ensemble/model.pt
+output_dir: outputs/conformal

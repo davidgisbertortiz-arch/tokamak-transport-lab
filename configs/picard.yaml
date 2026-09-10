@@ -1,0 +1,26 @@
+# Stationary single-channel example; solver time controls are unnecessary.
+picard:
+  max_iters: 80
+  tol: 1.0e-06
+  alpha0: 0.5
+  alpha_min: 0.05
+  alpha_max: 1.0
+  divergence_patience: 5
+grid:
+  n_rho: 100
+source:
+  S0: 1.0
+  rho_dep: 0.3
+  sigma: 0.1
+bc:
+  Te_ped: 500.0
+transport:
+  model: stiffness
+  chi_s: 1.0
+  a_over_LTe_crit: 3.0
+  alpha_s: 1.5
+  chi_neo: 0.01
+geometry: circular
+output_dir: outputs/picard
+model:
+  type: analytic

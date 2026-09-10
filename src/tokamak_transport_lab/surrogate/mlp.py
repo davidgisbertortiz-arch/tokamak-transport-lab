@@ -1,10 +1,8 @@
-"""Single MLP surrogate for normalised heat-flux prediction.
+"""Low-level MLP: SiLU hidden layers and configurable scalar output.
 
-Architecture
-------------
-input(n_features) → 128 → 128 → 64 → 1  (ReLU hidden, Softplus output)
-
-The softplus output guarantees Qe/Q_gB ≥ 0.
+Project training uses a linear output for standardized log diffusivity.
+The softplus option remains for standalone, nonnegative regression examples.
+Use TransportBundle to load complete project artifacts with their transforms.
 """
 
 from __future__ import annotations
@@ -16,7 +14,7 @@ import torch.nn as nn
 
 
 class TransportMLP(nn.Module):
-    """Feedforward MLP mapping local plasma parameters → Q_norm.
+    """Feedforward MLP with explicit output-space choice.
 
     Parameters
     ----------
@@ -30,16 +28,20 @@ class TransportMLP(nn.Module):
         self,
         n_features: int = 6,
         hidden: tuple[int, ...] = (128, 128, 64),
+        output_activation: str = "softplus",
     ) -> None:
         super().__init__()
         layers: list[nn.Module] = []
         in_dim = n_features
         for h in hidden:
             layers.append(nn.Linear(in_dim, h))
-            layers.append(nn.ReLU())
+            layers.append(nn.SiLU())
             in_dim = h
         layers.append(nn.Linear(in_dim, 1))
-        layers.append(nn.Softplus())  # enforce Q ≥ 0
+        if output_activation == "softplus":
+            layers.append(nn.Softplus())
+        elif output_activation != "linear":
+            raise ValueError("output_activation must be softplus or linear")
         self.net = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -52,7 +54,7 @@ class TransportMLP(nn.Module):
         Returns
         -------
         q_norm : Tensor (batch, 1)
-            Predicted normalised heat flux.
+            Raw output in the training target space.
         """
         return self.net(x)
 

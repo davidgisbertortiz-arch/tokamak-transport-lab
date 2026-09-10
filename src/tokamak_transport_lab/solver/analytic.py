@@ -67,9 +67,9 @@ def steady_state_reference(
         I_of_rho[k] = I_of_rho[k - 1] + 0.5 * (integrand_I[k - 1] + integrand_I[k]) * drho_q
 
     # f(ρ) = I(ρ) / (ρ χ)  — the integrand for outer integral
-    # Near ρ=0:  I(ρ) ~ ½ρ² S(0)  =>  I(ρ)/ρ → 0, so f(0) = S(0)/(2χ) via L'Hôpital.
+    # Near ρ=0:  I(ρ) ~ ½ρ² S(0)  =>  I(ρ)/ρ → 0, so f(0) = 0.
     f = np.zeros(n_quad)
-    f[0] = 0.5 * source_q[0] / chi0  # limiting value
+    f[0] = 0.0  # limiting value
     f[1:] = I_of_rho[1:] / (rho_q[1:] * chi0)
 
     # G(ρ) = ∫_ρ^1 f(ρ'') dρ''  — computed as G(ρ) = total - cumulative

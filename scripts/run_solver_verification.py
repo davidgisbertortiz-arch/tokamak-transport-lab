@@ -73,6 +73,11 @@ def main() -> None:
         theta=theta,
     )
 
+    if not result["converged"]:
+        raise SystemExit(
+            f"Transient did not reach steady state: PDE residual={result['steady_residual']:.3e}"
+        )
+
     rho = result["rho"]
     T_num = result["Te"]
     residual_history = result["residual_history"]
@@ -83,15 +88,15 @@ def main() -> None:
     )
 
     # ── Compute metrics ──────────────────────────────────────────
-    l2_err = float(np.linalg.norm(T_num - T_ref) / np.linalg.norm(T_ref))
-    linf_err = float(np.max(np.abs(T_num - T_ref)) / np.max(np.abs(T_ref)))
+    l2_err = float(np.linalg.norm(T_num - T_ref) / np.linalg.norm(T_ref - t_ped))
+    linf_err = float(np.max(np.abs(T_num - T_ref)) / np.max(np.abs(T_ref - t_ped)))
     source = gaussian_source(rho, s0=s0, rho_dep=rho_dep, sigma=sigma)
 
     print(f"Grid points      : {n_rho}")
     print(f"Time steps       : {n_steps}")
     print(f"Final residual   : {residual_history[-1]:.3e}")
-    print(f"L² relative error: {l2_err:.3e}")
-    print(f"L∞ relative error: {linf_err:.3e}")
+    print(f"L² rise-relative error: {l2_err:.3e}")
+    print(f"L∞ rise-relative error: {linf_err:.3e}")
 
     # ── Save NPZ ─────────────────────────────────────────────────
     out_dir = pathlib.Path(args.output_dir)
